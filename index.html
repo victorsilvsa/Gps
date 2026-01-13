@@ -2,484 +2,221 @@
 <html lang="pt-BR">
  <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rastreador GPS Militar - Precisão Máxima</title><!-- Firebase SDK -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Rastreador GPS Profissional</title><!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script><!-- Leaflet (OpenStreetMap) - 100% GRATUITO -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script><!-- Leaflet (OpenStreetMap) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><!-- Elements SDK -->
-  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script><!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&amp;family=Montserrat:wght@400;600;700;800&amp;display=swap" rel="stylesheet"><!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
   <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             box-sizing: border-box;
         }
 
-        html, body, #app-container {
+        html, body {
             height: 100%;
             width: 100%;
+            overflow: hidden;
         }
 
         body {
-            font-family: 'Rajdhani', 'Orbitron', 'Exo 2', monospace;
-            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
-            color: #e0e7ff;
-            overflow: hidden;
-        }
-
-        #app-container {
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
+            font-family: 'Montserrat', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
         }
 
         /* ============================================
-           HEADER COM INDICADORES DE STATUS
+           VARIÁVEIS DE COR
         ============================================ */
-        header {
-            background: linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(204, 85, 0, 0.1) 100%);
-            backdrop-filter: blur(25px);
-            border-bottom: 3px solid rgba(255, 107, 0, 0.4);
-            padding: 20px 35px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-            position: relative;
-            overflow: hidden;
+        :root {
+            --gold: #D4C29A;
+            --gold-dark: #B8A67D;
+            --black: #0a0a0a;
+            --dark-gray: #1a1a1a;
+            --medium-gray: #2a2a2a;
+            --light-gray: #cccccc;
+            --green: #22c55e;
+            --yellow: #facc15;
+            --red: #ef4444;
         }
 
-        header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
+        /* ============================================
+           CONTAINER PRINCIPAL
+        ============================================ */
+        #app {
+            position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 107, 0, 0.1), transparent);
-            animation: scanline 3s linear infinite;
-        }
-
-        @keyframes scanline {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
-
-        .header-grid {
-            max-width: 1600px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr auto auto;
-            align-items: center;
-            gap: 30px;
-        }
-
-        .header-title-group h1 {
-            font-size: 32px;
-            font-weight: 900;
-            background: linear-gradient(135deg, #ff6b00 0%, #ff9100 50%, #ffa726 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            text-shadow: 0 0 30px rgba(255, 107, 0, 0.5);
-            animation: titleGlow 2s ease-in-out infinite;
-        }
-
-        @keyframes titleGlow {
-            0%, 100% { filter: brightness(1); }
-            50% { filter: brightness(1.3); }
-        }
-
-        .header-subtitle {
-            font-size: 13px;
-            color: #94a3b8;
-            margin-top: 5px;
-            font-weight: 600;
-            letter-spacing: 1px;
-        }
-
-        /* GPS Status Badge */
-        .gps-status-badge {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            background: rgba(10, 14, 39, 0.8);
-            border: 2px solid rgba(255, 107, 0, 0.3);
-            border-radius: 12px;
-            padding: 12px 18px;
-            min-width: 180px;
         }
 
-        .gps-lock-indicator {
+        /* ============================================
+           MAPA FULLSCREEN
+        ============================================ */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Mapa dark natural */
+        .leaflet-tile {
+            filter: brightness(0.9) saturate(1.1);
+        }
+
+        /* ============================================
+           STATUS CARD (GLASSMORPHISM)
+        ============================================ */
+        .status-card {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 40px);
+            max-width: 380px;
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 194, 154, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .status-header {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            justify-content: space-between;
+            margin-bottom: 18px;
         }
 
-        .lock-dot {
+        .status-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--gold);
+            letter-spacing: 0.5px;
+        }
+
+        .gps-indicator {
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            position: relative;
+            background: var(--yellow);
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 15px currentColor;
         }
 
-        .lock-dot.searching {
-            background: #facc15;
-            animation: searchPulse 1.5s ease-in-out infinite;
+        .gps-indicator.active {
+            background: var(--green);
         }
 
-        .lock-dot.locked {
-            background: #22c55e;
-            box-shadow: 0 0 15px #22c55e;
-            animation: lockPulse 2s ease-in-out infinite;
+        .gps-indicator.error {
+            background: var(--red);
+            animation: blink 0.8s ease-in-out infinite;
         }
 
-        .lock-dot.error {
-            background: #ef4444;
-            animation: errorBlink 0.8s ease-in-out infinite;
-        }
-
-        @keyframes searchPulse {
+        @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.3); }
+            50% { opacity: 0.6; transform: scale(1.3); }
         }
 
-        @keyframes lockPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        @keyframes errorBlink {
+        @keyframes blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
 
-        .satellite-count {
-            font-size: 11px;
-            color: #94a3b8;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .sat-icon {
-            font-size: 16px;
-        }
-
-        /* System Stats */
-        .system-stats {
-            display: flex;
-            gap: 20px;
-            background: rgba(10, 14, 39, 0.8);
-            border: 2px solid rgba(255, 107, 0, 0.3);
-            border-radius: 12px;
-            padding: 12px 20px;
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .stat-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #94a3b8;
-            font-weight: 600;
-        }
-
-        .stat-value {
-            font-size: 18px;
-            font-weight: 900;
-            color: #ff6b00;
-            text-shadow: 0 0 10px rgba(255, 107, 0, 0.5);
-        }
-
-        /* ============================================
-           MAIN LAYOUT - SIDEBAR + MAP
-        ============================================ */
-        main {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 420px 1fr;
-            gap: 0;
-            overflow: hidden;
-        }
-
-        /* ============================================
-           SIDEBAR - CONTROLES E DADOS
-        ============================================ */
-        .control-sidebar {
-            background: linear-gradient(180deg, rgba(10, 14, 39, 0.95) 0%, rgba(15, 20, 25, 0.98) 100%);
-            border-right: 3px solid rgba(255, 107, 0, 0.3);
-            overflow-y: auto;
-            padding: 25px;
-            box-shadow: 10px 0 50px rgba(0, 0, 0, 0.5);
-        }
-
-        .section-header {
-            font-size: 12px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #ff6b00;
-            margin-bottom: 18px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid rgba(255, 107, 0, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .section-icon {
-            font-size: 18px;
-            filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.6));
-        }
-
-        /* Control Buttons */
-        .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 30px;
-        }
-
-        .control-btn {
-            padding: 16px 22px;
-            font-size: 15px;
-            font-weight: 700;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            position: relative;
-            overflow: hidden;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-family: 'Rajdhani', sans-serif;
-        }
-
-        .control-btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .control-btn:hover:not(:disabled)::before {
-            width: 400px;
-            height: 400px;
-        }
-
-        .control-btn span {
-            position: relative;
-            z-index: 1;
-        }
-
-        .btn-start {
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            color: #000;
-            box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4);
-            border: 2px solid rgba(34, 197, 94, 0.6);
-        }
-
-        .btn-start:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 35px rgba(34, 197, 94, 0.6);
-        }
-
-        .btn-stop {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: #fff;
-            box-shadow: 0 6px 25px rgba(239, 68, 68, 0.4);
-            border: 2px solid rgba(239, 68, 68, 0.6);
-        }
-
-        .btn-stop:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 35px rgba(239, 68, 68, 0.6);
-        }
-
-        .btn-center {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: #fff;
-            box-shadow: 0 6px 25px rgba(59, 130, 246, 0.4);
-            border: 2px solid rgba(59, 130, 246, 0.6);
-        }
-
-        .btn-center:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 35px rgba(59, 130, 246, 0.6);
-        }
-
-        .control-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        /* GPS Alert Box */
-        .gps-alert {
-            background: linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(202, 138, 4, 0.1) 100%);
-            border: 2px solid rgba(234, 179, 8, 0.4);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 25px;
-            display: flex;
-            gap: 12px;
-            align-items: start;
-        }
-
-        .gps-alert-icon {
-            font-size: 24px;
-            color: #facc15;
-            flex-shrink: 0;
-            animation: alertPulse 2s ease-in-out infinite;
-        }
-
-        @keyframes alertPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-        }
-
-        .gps-alert-text {
-            flex: 1;
-        }
-
-        .gps-alert-title {
-            font-size: 13px;
-            font-weight: 800;
-            color: #facc15;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-        }
-
-        .gps-alert-message {
-            font-size: 12px;
-            color: #cbd5e1;
-            line-height: 1.5;
-        }
-
-        /* Data Cards */
+        /* Dados em grid */
         .data-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-bottom: 25px;
+            margin-bottom: 18px;
         }
 
-        .data-card {
-            background: linear-gradient(135deg, rgba(255, 107, 0, 0.08) 0%, rgba(204, 85, 0, 0.05) 100%);
-            border: 2px solid rgba(255, 107, 0, 0.25);
-            border-radius: 10px;
-            padding: 15px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .data-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 107, 0, 0.1), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .data-card:hover::before {
-            left: 100%;
-        }
-
-        .data-card:hover {
-            border-color: rgba(255, 107, 0, 0.5);
-            transform: translateX(5px);
-            box-shadow: 0 5px 20px rgba(255, 107, 0, 0.2);
+        .data-item {
+            background: rgba(42, 42, 42, 0.6);
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid rgba(212, 194, 154, 0.15);
         }
 
         .data-label {
             font-size: 10px;
-            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #94a3b8;
-            margin-bottom: 8px;
+            color: var(--light-gray);
+            margin-bottom: 6px;
+            font-weight: 600;
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
+        .data-label i {
+            color: var(--gold);
+        }
+
         .data-value {
-            font-size: 22px;
-            font-weight: 900;
-            color: #ff6b00;
-            text-shadow: 0 0 15px rgba(255, 107, 0, 0.5);
-            word-break: break-all;
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--gold);
+            font-family: 'Montserrat', sans-serif;
         }
 
-        .data-subvalue {
-            font-size: 11px;
-            color: #64748b;
-            margin-top: 5px;
+        .data-item.full {
+            grid-column: 1 / -1;
+        }
+
+        .data-value.address {
+            font-size: 13px;
             font-weight: 600;
+            line-height: 1.4;
+            color: #ffffff;
         }
 
-        /* Precision Meter */
-        .precision-meter {
-            background: rgba(10, 14, 39, 0.6);
-            border-radius: 8px;
-            padding: 10px;
-            margin-top: 10px;
-        }
-
-        .precision-bar-bg {
-            height: 8px;
+        /* Barra de precisão */
+        .precision-bar {
+            width: 100%;
+            height: 6px;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
-            position: relative;
+            margin-top: 8px;
         }
 
-        .precision-bar-fill {
+        .precision-fill {
             height: 100%;
-            background: linear-gradient(90deg, #22c55e, #16a34a);
-            border-radius: 4px;
+            background: var(--green);
+            border-radius: 3px;
             transition: width 0.5s ease, background 0.5s ease;
             position: relative;
         }
 
-        .precision-bar-fill::after {
+        .precision-fill::after {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
             animation: shimmer 2s infinite;
         }
 
@@ -488,120 +225,211 @@
             100% { transform: translateX(100%); }
         }
 
-        .precision-bar-fill.medium {
-            background: linear-gradient(90deg, #f59e0b, #d97706);
-        }
-
-        .precision-bar-fill.low {
-            background: linear-gradient(90deg, #ef4444, #dc2626);
-        }
-
-        .precision-labels {
+        /* ============================================
+           BOTÃO DE CONTROLE (FAB)
+        ============================================ */
+        .fab-button {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+            border: none;
+            border-radius: 50%;
             display: flex;
-            justify-content: space-between;
-            margin-top: 6px;
-            font-size: 10px;
-            color: #64748b;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--black);
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 6px 30px rgba(212, 194, 154, 0.5);
+            transition: all 0.3s ease;
         }
 
-        /* Address Box */
-        .address-box {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.05) 100%);
-            border: 2px solid rgba(59, 130, 246, 0.3);
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 25px;
+        .fab-button:active {
+            transform: translateX(-50%) scale(0.95);
         }
 
-        .address-content {
-            font-size: 13px;
-            line-height: 1.7;
-            color: #cbd5e1;
+        .fab-button.recording {
+            background: linear-gradient(135deg, var(--red) 0%, #dc2626 100%);
+            animation: recordPulse 1.5s ease-in-out infinite;
         }
 
-        .address-content strong {
-            color: #3b82f6;
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
+        @keyframes recordPulse {
+            0%, 100% { box-shadow: 0 6px 30px rgba(239, 68, 68, 0.5); }
+            50% { box-shadow: 0 6px 40px rgba(239, 68, 68, 0.8); }
         }
 
         /* ============================================
-           MAP SECTION
+           MARCADOR CUSTOMIZADO (PULSE EFFECT)
         ============================================ */
-        .map-wrapper {
+        .custom-marker {
             position: relative;
-            overflow: hidden;
+            width: 40px;
+            height: 40px;
         }
 
-        #map-canvas {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Map Overlay Controls */
-        .map-controls-overlay {
+        .marker-pulse {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, rgba(10, 14, 39, 0.95) 0%, rgba(15, 20, 25, 0.98) 100%);
-            backdrop-filter: blur(25px);
-            border: 2px solid rgba(255, 107, 0, 0.4);
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-            z-index: 1000;
-            min-width: 200px;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(212, 194, 154, 0.4);
+            transform: translate(-50%, -50%);
+            animation: markerPulse 2s ease-out infinite;
         }
 
-        .overlay-title {
-            font-size: 11px;
-            font-weight: 800;
-            color: #ff6b00;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
+        @keyframes markerPulse {
+            0% {
+                width: 40px;
+                height: 40px;
+                opacity: 1;
+            }
+            100% {
+                width: 80px;
+                height: 80px;
+                opacity: 0;
+            }
+        }
+
+        .marker-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 30px;
+            height: 30px;
+            background: var(--gold);
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--black);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
         }
 
-        .map-control-buttons {
+        .marker-label {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 10, 0.95);
+            color: var(--gold);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            border: 1px solid var(--gold);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        /* ============================================
+           CÍRCULO DE PRECISÃO
+        ============================================ */
+        .accuracy-circle {
+            fill: rgba(212, 194, 154, 0.15);
+            stroke: var(--gold);
+            stroke-width: 2;
+        }
+
+        /* ============================================
+           TOAST NOTIFICATION
+        ============================================ */
+        .toast {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 194, 154, 0.4);
+            border-radius: 12px;
+            padding: 14px 20px;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+            animation: slideUp 0.4s ease-out;
+            max-width: calc(100% - 40px);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .toast-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+            color: var(--gold);
+        }
+
+        .toast-text {
+            font-size: 13px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* ============================================
+           ZOOM CONTROLS
+        ============================================ */
+        .zoom-controls {
+            position: fixed;
+            bottom: 120px;
+            right: 20px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
+            z-index: 1000;
         }
 
-        .map-ctrl-btn {
-            padding: 10px 14px;
-            font-size: 12px;
-            font-weight: 700;
-            background: rgba(255, 107, 0, 0.15);
-            border: 1px solid rgba(255, 107, 0, 0.4);
-            color: #ff6b00;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
+        .zoom-btn {
+            width: 45px;
+            height: 45px;
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 194, 154, 0.3);
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-family: 'Rajdhani', sans-serif;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--gold);
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        .map-ctrl-btn:hover {
-            background: rgba(255, 107, 0, 0.25);
-            border-color: #ff6b00;
-            transform: translateX(-3px);
+        .zoom-btn:active {
+            transform: scale(0.95);
+            background: rgba(212, 194, 154, 0.2);
         }
 
-        /* Loading Overlay */
-        .loading-overlay {
-            position: absolute;
+        /* ============================================
+           LOADING
+        ============================================ */
+        .loading {
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(10, 14, 39, 0.95);
+            background: var(--black);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -610,10 +438,10 @@
         }
 
         .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 5px solid rgba(255, 107, 0, 0.2);
-            border-top-color: #ff6b00;
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(212, 194, 154, 0.2);
+            border-top-color: var(--gold);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -624,126 +452,25 @@
 
         .loading-text {
             margin-top: 20px;
-            font-size: 16px;
-            color: #94a3b8;
-            font-weight: 700;
-            letter-spacing: 1px;
+            font-size: 14px;
+            color: var(--light-gray);
+            font-weight: 600;
         }
 
-        /* Toast Notifications */
-        .toast-notification {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: linear-gradient(135deg, rgba(10, 14, 39, 0.98) 0%, rgba(15, 20, 25, 0.98) 100%);
-            backdrop-filter: blur(25px);
-            border: 2px solid rgba(255, 107, 0, 0.5);
-            padding: 18px 24px;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            z-index: 20000;
-            animation: slideInUp 0.4s ease-out;
-            max-width: 450px;
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .toast-icon {
-            font-size: 28px;
-            flex-shrink: 0;
-        }
-
-        .toast-body {
-            flex: 1;
-        }
-
-        .toast-title {
-            font-weight: 800;
-            font-size: 15px;
-            color: #fff;
-            margin-bottom: 3px;
-            letter-spacing: 0.5px;
-        }
-
-        .toast-message {
-            font-size: 13px;
-            color: #94a3b8;
-            line-height: 1.4;
-        }
-
-        .toast-success {
-            border-left: 5px solid #22c55e;
-        }
-
-        .toast-error {
-            border-left: 5px solid #ef4444;
-        }
-
-        .toast-warning {
-            border-left: 5px solid #f59e0b;
-        }
-
-        .toast-info {
-            border-left: 5px solid #3b82f6;
-        }
-
-        /* Responsive */
-        @media (max-width: 1200px) {
-            main {
-                grid-template-columns: 1fr;
-            }
-
-            .control-sidebar {
-                border-right: none;
-                border-bottom: 3px solid rgba(255, 107, 0, 0.3);
-                max-height: 450px;
-            }
-
-            .header-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-
-            .system-stats {
-                justify-content: space-around;
-            }
-        }
-
-        @media (max-width: 640px) {
-            .header-grid {
-                padding: 15px 20px;
-            }
-
-            .header-title-group h1 {
-                font-size: 22px;
+        /* ============================================
+           RESPONSIVE (TABLET+)
+        ============================================ */
+        @media (min-width: 768px) {
+            .status-card {
+                max-width: 420px;
             }
 
             .data-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(3, 1fr);
             }
 
-            .map-controls-overlay {
-                left: 10px;
-                right: 10px;
-                top: 10px;
-            }
-
-            .toast-notification {
-                left: 20px;
-                right: 20px;
-                bottom: 20px;
+            .data-item.full {
+                grid-column: 1 / -1;
             }
         }
     </style>
@@ -752,135 +479,69 @@
   <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
  </head>
  <body>
-  <div id="app-container">
-   <header>
-    <div class="header-grid">
-     <div class="header-title-group">
-      <h1 id="system-title">🛰️ RASTREADOR GPS MILITAR</h1>
-      <p class="header-subtitle" id="company-name">Sistema de Precisão Máxima</p>
+  <div id="app"><!-- Mapa Fullscreen -->
+   <div id="map"></div><!-- Status Card (Glassmorphism) -->
+   <div class="status-card">
+    <div class="status-header">
+     <h1 class="status-title" id="tech-name">Técnico</h1>
+     <div class="gps-indicator" id="gps-status"></div>
+    </div>
+    <div class="data-grid">
+     <div class="data-item">
+      <div class="data-label">
+       Precisão
+      </div>
+      <div class="data-value" id="accuracy-value">
+       --
+      </div>
+      <div class="precision-bar">
+       <div class="precision-fill" id="precision-fill"></div>
+      </div>
      </div>
-     <div class="gps-status-badge">
-      <div class="gps-lock-indicator"><span class="lock-dot searching" id="lock-indicator"></span> <span id="lock-status-text">BUSCANDO GPS</span>
+     <div class="data-item">
+      <div class="data-label">
+       Velocidade
       </div>
-      <div class="satellite-count"><span class="sat-icon">🛰️</span> <span id="satellite-info">Aguardando sinais...</span>
+      <div class="data-value" id="speed-value">
+       -- km/h
       </div>
      </div>
-     <div class="system-stats">
-      <div class="stat-item"><span class="stat-label">Precisão</span> <span class="stat-value" id="header-accuracy">--</span>
+     <div class="data-item">
+      <div class="data-label">
+       Latitude
       </div>
-      <div class="stat-item"><span class="stat-label">Velocidade</span> <span class="stat-value" id="header-speed">--</span>
+      <div class="data-value" style="font-size: 14px;" id="lat-value">
+       --
       </div>
-      <div class="stat-item"><span class="stat-label">Atualizações</span> <span class="stat-value" id="update-counter">0</span>
+     </div>
+     <div class="data-item">
+      <div class="data-label">
+       Longitude
+      </div>
+      <div class="data-value" style="font-size: 14px;" id="lng-value">
+       --
+      </div>
+     </div>
+     <div class="data-item full">
+      <div class="data-label">
+       <i class="fas fa-map-marker-alt"></i> Endereço
+      </div>
+      <div class="data-value address" id="address-value">
+       Aguardando localização...
       </div>
      </div>
     </div>
-   </header>
-   <main>
-    <aside class="control-sidebar">
-     <div class="section-header"><span class="section-icon">🎮</span> <span>CONTROLES DO SISTEMA</span>
-     </div>
-     <div class="button-group"><button id="btn-start-tracking" class="control-btn btn-start"> <span>▶️ ATIVAR RASTREAMENTO GPS</span> </button> <button id="btn-stop-tracking" class="control-btn btn-stop" disabled> <span>⏹️ DESATIVAR RASTREAMENTO</span> </button> <button id="btn-center-map" class="control-btn btn-center"> <span>🎯 CENTRALIZAR NO TÉCNICO</span> </button>
-     </div>
-     <div class="gps-alert">
-      <div class="gps-alert-icon">
-       ⚠️
-      </div>
-      <div class="gps-alert-text">
-       <div class="gps-alert-title">
-        ATENÇÃO
-       </div>
-       <div class="gps-alert-message" id="alert-message">
-        Mantenha a tela ligada e o navegador aberto para rastreamento contínuo. O GPS precisa ficar ativo.
-       </div>
-      </div>
-     </div>
-     <div class="section-header"><span class="section-icon">📊</span> <span>DADOS EM TEMPO REAL</span>
-     </div>
-     <div class="data-grid">
-      <div class="data-card">
-       <div class="data-label">
-        👤 TÉCNICO
-       </div>
-       <div class="data-value" id="technician-display">
-        Técnico 01
-       </div>
-      </div>
-      <div class="data-card">
-       <div class="data-label">
-        📍 LATITUDE
-       </div>
-       <div class="data-value" id="lat-display">
-        --
-       </div>
-      </div>
-      <div class="data-card">
-       <div class="data-label">
-        📍 LONGITUDE
-       </div>
-       <div class="data-value" id="lng-display">
-        --
-       </div>
-      </div>
-      <div class="data-card">
-       <div class="data-label">
-        🚀 VELOCIDADE
-       </div>
-       <div class="data-value" id="speed-display">
-        -- km/h
-       </div>
-       <div class="data-subvalue" id="speed-status">
-        Aguardando GPS
-       </div>
-      </div>
-      <div class="data-card">
-       <div class="data-label">
-        🎯 PRECISÃO GPS
-       </div>
-       <div class="data-value" id="accuracy-display">
-        -- m
-       </div>
-       <div class="precision-meter">
-        <div class="precision-bar-bg">
-         <div class="precision-bar-fill" id="precision-bar" style="width: 0%;"></div>
-        </div>
-        <div class="precision-labels"><span>0m</span> <span id="precision-quality">--</span> <span>100m</span>
-        </div>
-       </div>
-      </div>
-      <div class="data-card">
-       <div class="data-label">
-        🕐 ÚLTIMA ATUALIZAÇÃO
-       </div>
-       <div class="data-value" style="font-size: 18px;" id="last-update-time">
-        --:--:--
-       </div>
-      </div>
-     </div>
-     <div class="section-header"><span class="section-icon">🗺️</span> <span>ENDEREÇO DETECTADO</span>
-     </div>
-     <div class="address-box">
-      <div class="address-content" id="address-display"><strong>📍 Aguardando GPS de alta precisão...</strong> Ative o rastreamento para detectar o endereço exato com nome de rua e número.
-      </div>
-     </div>
-    </aside>
-    <section class="map-wrapper">
-     <div id="map-canvas"></div>
-     <div class="map-controls-overlay">
-      <div class="overlay-title"><span>🗺️</span> <span>CONTROLES DO MAPA</span>
-      </div>
-      <div class="map-control-buttons"><button class="map-ctrl-btn" onclick="zoomMapIn()"> <span>🔍</span> <span>Zoom +</span> </button> <button class="map-ctrl-btn" onclick="zoomMapOut()"> <span>🔍</span> <span>Zoom -</span> </button> <button class="map-ctrl-btn" onclick="toggleMapType()"> <span>🗺️</span> <span id="map-type-label">Mudar Estilo</span> </button>
-      </div>
-     </div>
-     <div class="loading-overlay" id="map-loading">
-      <div class="loading-spinner"></div>
-      <p class="loading-text">Inicializando OpenStreetMap (100% gratuito)...</p>
-     </div>
-    </section>
-   </main>
+   </div><!-- FAB Button --> <button class="fab-button" id="fab-btn"> <i class="fas fa-play" id="fab-icon"></i> </button> <!-- Zoom Controls -->
+   <div class="zoom-controls"><button class="zoom-btn" id="zoom-in"><i class="fas fa-plus"></i></button> <button class="zoom-btn" id="zoom-out"><i class="fas fa-minus"></i></button> <button class="zoom-btn" id="center-btn"><i class="fas fa-crosshairs"></i></button> <button class="zoom-btn" id="clear-route" title="Limpar rota"><i class="fas fa-trash-alt"></i></button>
+   </div><!-- Loading -->
+   <div class="loading" id="loading">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Carregando mapa...</p>
+   </div>
   </div>
   <script>
         // ============================================
-        // CONFIGURAÇÃO DO FIREBASE
+        // FIREBASE CONFIG
         // ============================================
         const firebaseConfig = {
             apiKey: "AIzaSyCp3DZIwvysN8YpOQknX20SqprkBWEZ-Bc",
@@ -894,124 +555,164 @@
         };
 
         firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        const db = firebase.database();
 
         // ============================================
         // VARIÁVEIS GLOBAIS
         // ============================================
-        let leafletMap = null;
-        let technicianMarker = null;
+        let map = null;
+        let marker = null;
         let accuracyCircle = null;
-        let gpsWatchId = null;
+        let watchId = null;
         let isTracking = false;
-        let updateCount = 0;
-        let currentMapType = 'osm';
-
-        // Configuração default do Elements SDK
-        const defaultConfig = {
-            system_title: '🛰️ RASTREADOR GPS MILITAR',
-            technician_name: 'Técnico 01',
-            company_name: 'Sistema de Precisão Máxima',
-            alert_message: 'Mantenha a tela ligada e o navegador aberto para rastreamento contínuo. O GPS precisa ficar ativo.',
-            primary_color: '#ff6b00',
-            background_color: '#0a0e27',
-            accent_color: '#ff9100',
-            success_color: '#22c55e',
-            danger_color: '#ef4444'
-        };
+        let wakeLock = null;
+        let routePath = null;
+        let routeCoordinates = [];
 
         // ============================================
-        // FUNÇÕES DE NOTIFICAÇÃO (TOAST)
+        // ELEMENTOS DOM
         // ============================================
-        function showToast(title, message, type = 'info') {
-            const existingToast = document.querySelector('.toast-notification');
-            if (existingToast) existingToast.remove();
+        const fabBtn = document.getElementById('fab-btn');
+        const fabIcon = document.getElementById('fab-icon');
+        const gpsStatus = document.getElementById('gps-status');
+        const accuracyValue = document.getElementById('accuracy-value');
+        const speedValue = document.getElementById('speed-value');
+        const latValue = document.getElementById('lat-value');
+        const lngValue = document.getElementById('lng-value');
+        const addressValue = document.getElementById('address-value');
+        const precisionFill = document.getElementById('precision-fill');
+        const techName = document.getElementById('tech-name');
+        const loading = document.getElementById('loading');
 
-            const icons = {
-                success: '✅',
-                error: '❌',
-                info: 'ℹ️',
-                warning: '⚠️'
-            };
+        // ============================================
+        // INICIALIZAR MAPA (LEAFLET + DARK STYLE)
+        // ============================================
+        function initMap() {
+            map = L.map('map', {
+                center: [-15.78, -47.92],
+                zoom: 18,
+                zoomControl: false,
+                attributionControl: false
+            });
 
-            const toast = document.createElement('div');
-            toast.className = `toast-notification toast-${type}`;
-            toast.innerHTML = `
-                <div class="toast-icon">${icons[type]}</div>
-                <div class="toast-body">
-                    <div class="toast-title">${title}</div>
-                    <div class="toast-message">${message}</div>
-                </div>
-            `;
+            // Dark tiles (CartoDB Dark Matter)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 20
+            }).addTo(map);
 
-            document.body.appendChild(toast);
+            loading.style.display = 'none';
 
-            setTimeout(() => {
-                toast.style.animation = 'slideInUp 0.4s ease-out reverse';
-                setTimeout(() => toast.remove(), 400);
-            }, 5000);
+            // Escutar Firebase
+            db.ref('tracking/tecnico_01').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) updateUI(data);
+            });
         }
 
         // ============================================
-        // ATUALIZAÇÃO DE INDICADORES VISUAIS
+        // ATUALIZAR UI COM DADOS GPS
         // ============================================
-        function updateGPSLockStatus(status, satellites = 0) {
-            const lockDot = document.getElementById('lock-indicator');
-            const lockText = document.getElementById('lock-status-text');
-            const satInfo = document.getElementById('satellite-info');
+        function updateUI(data) {
+            const { lat, lng, accuracy, speed } = data;
 
-            lockDot.className = 'lock-dot';
+            // Atualizar valores
+            accuracyValue.textContent = accuracy.toFixed(0) + 'm';
+            speedValue.textContent = speed.toFixed(0) + ' km/h';
+            latValue.textContent = lat.toFixed(6);
+            lngValue.textContent = lng.toFixed(6);
 
-            if (status === 'searching') {
-                lockDot.classList.add('searching');
-                lockText.textContent = 'BUSCANDO GPS';
-                satInfo.textContent = 'Procurando satélites...';
-            } else if (status === 'locked') {
-                lockDot.classList.add('locked');
-                lockText.textContent = 'GPS TRAVADO';
-                satInfo.textContent = `${satellites} satélites conectados`;
-            } else if (status === 'error') {
-                lockDot.classList.add('error');
-                lockText.textContent = 'SEM SINAL';
-                satInfo.textContent = 'Erro ao obter GPS';
-            }
-        }
-
-        function updatePrecisionMeter(accuracy) {
-            const bar = document.getElementById('precision-bar');
-            const quality = document.getElementById('precision-quality');
-
-            let percentage, qualityText, className;
+            // Barra de precisão
+            let precisionPercent = 100;
+            let fillColor = '#22c55e';
 
             if (accuracy <= 10) {
-                percentage = 100;
-                qualityText = 'EXCELENTE';
-                className = '';
+                precisionPercent = 100;
+                fillColor = '#22c55e';
             } else if (accuracy <= 20) {
-                percentage = 80;
-                qualityText = 'ÓTIMA';
-                className = '';
+                precisionPercent = 75;
+                fillColor = '#22c55e';
             } else if (accuracy <= 50) {
-                percentage = 50;
-                qualityText = 'BOA';
-                className = 'medium';
+                precisionPercent = 50;
+                fillColor = '#facc15';
             } else {
-                percentage = 20;
-                qualityText = 'FRACA';
-                className = 'low';
+                precisionPercent = 25;
+                fillColor = '#ef4444';
             }
 
-            bar.style.width = percentage + '%';
-            bar.className = 'precision-bar-fill ' + className;
-            quality.textContent = qualityText;
+            precisionFill.style.width = precisionPercent + '%';
+            precisionFill.style.background = fillColor;
+
+            // Status GPS
+            if (accuracy <= 20) {
+                gpsStatus.className = 'gps-indicator active';
+            } else {
+                gpsStatus.className = 'gps-indicator';
+            }
+
+            // Atualizar marcador
+            const position = [lat, lng];
+
+            // Adicionar ponto à rota se estiver rastreando
+            if (isTracking) {
+                routeCoordinates.push(position);
+
+                if (!routePath) {
+                    // Criar linha da rota
+                    routePath = L.polyline(routeCoordinates, {
+                        color: '#D4C29A',
+                        weight: 4,
+                        opacity: 0.8,
+                        smoothFactor: 1,
+                        lineCap: 'round',
+                        lineJoin: 'round'
+                    }).addTo(map);
+                } else {
+                    // Atualizar rota existente
+                    routePath.setLatLngs(routeCoordinates);
+                }
+            }
+
+            if (!marker) {
+                // Criar marcador custom
+                const customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `
+                        <div class="marker-pulse"></div>
+                        <div class="marker-icon"><i class="fas fa-user"></i></div>
+                        <div class="marker-label"><i class="fas fa-user-tie"></i> ${techName.textContent}</div>
+                    `,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+
+                marker = L.marker(position, { icon: customIcon }).addTo(map);
+
+                // Círculo de precisão
+                accuracyCircle = L.circle(position, {
+                    radius: accuracy,
+                    color: '#D4C29A',
+                    fillColor: '#D4C29A',
+                    fillOpacity: 0.15,
+                    weight: 2
+                }).addTo(map);
+
+                map.setView(position, 19);
+            } else {
+                marker.setLatLng(position);
+                accuracyCircle.setLatLng(position);
+                accuracyCircle.setRadius(accuracy);
+                map.panTo(position);
+            }
+
+            // Buscar endereço
+            getAddress(lat, lng);
         }
 
         // ============================================
-        // REVERSE GEOCODING - ENDEREÇO EXATO (API GRATUITA)
+        // REVERSE GEOCODING (ENDEREÇO EXATO)
         // ============================================
-        async function getExactAddress(lat, lng) {
+        async function getAddress(lat, lng) {
             try {
-                // OpenStreetMap Nominatim - 100% GRATUITO
                 const response = await fetch(
                     `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
                     { headers: { 'User-Agent': 'GPS-Tracker/1.0' } }
@@ -1019,373 +720,195 @@
                 const data = await response.json();
 
                 if (data && data.display_name) {
-                    document.getElementById('address-display').innerHTML = `
-                        <strong>📍 Localização Exata:</strong>
-                        ${data.display_name}
-                    `;
-
-                    showToast('Endereço Detectado!', data.display_name, 'success');
+                    addressValue.textContent = data.display_name;
                 } else {
-                    document.getElementById('address-display').innerHTML = `
-                        <strong>📍 Coordenadas:</strong>
-                        ${lat.toFixed(6)}, ${lng.toFixed(6)}
-                    `;
+                    addressValue.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                 }
             } catch (error) {
-                console.error('Erro ao buscar endereço:', error);
-                document.getElementById('address-display').innerHTML = `
-                    <strong>📍 Coordenadas:</strong>
-                    ${lat.toFixed(6)}, ${lng.toFixed(6)}
-                `;
+                addressValue.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             }
         }
 
         // ============================================
-        // INICIALIZAÇÃO DO LEAFLET MAP (OPENSTREETMAP - GRÁTIS)
+        // CONTROLE DE RASTREAMENTO
         // ============================================
-        function initLeafletMap() {
-            // Cria mapa usando OpenStreetMap
-            leafletMap = L.map('map-canvas', {
-                center: [-15.78, -47.92],
-                zoom: 19,
-                zoomControl: false
-            });
+        function startTracking() {
+            if (isTracking) return;
 
-            // Adiciona camadas de tiles gratuitas
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxZoom: 19
-            });
+            showToast('<i class="fas fa-satellite"></i>', 'Iniciando GPS de alta precisão...');
+            gpsStatus.className = 'gps-indicator';
 
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Esri',
-                maxZoom: 19
-            });
-
-            // Define camadas disponíveis
-            window.mapLayers = {
-                osm: osmLayer,
-                satellite: satelliteLayer
+            const options = {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 30000
             };
 
-            // Adiciona camada padrão
-            osmLayer.addTo(leafletMap);
-
-            document.getElementById('map-loading').style.display = 'none';
-
-            listenToFirebaseUpdates();
-
-            showToast('Mapa Carregado!', 'OpenStreetMap inicializado (100% gratuito)', 'success');
-        }
-
-        // ============================================
-        // CONTROLES DO MAPA
-        // ============================================
-        function zoomMapIn() {
-            if (leafletMap) {
-                leafletMap.zoomIn();
-                showToast('Zoom Aumentado', '', 'info');
-            }
-        }
-
-        function zoomMapOut() {
-            if (leafletMap) {
-                leafletMap.zoomOut();
-                showToast('Zoom Diminuído', '', 'info');
-            }
-        }
-
-        function toggleMapType() {
-            if (!leafletMap) return;
-
-            // Remove camada atual
-            leafletMap.eachLayer((layer) => {
-                if (layer instanceof L.TileLayer) {
-                    leafletMap.removeLayer(layer);
-                }
-            });
-
-            // Alterna entre camadas
-            if (currentMapType === 'osm') {
-                window.mapLayers.satellite.addTo(leafletMap);
-                currentMapType = 'satellite';
-                showToast('Estilo Alterado', 'Visão de Satélite', 'info');
-            } else {
-                window.mapLayers.osm.addTo(leafletMap);
-                currentMapType = 'osm';
-                showToast('Estilo Alterado', 'Mapa de Ruas', 'info');
-            }
-        }
-
-        // ============================================
-        // SISTEMA DE RASTREAMENTO GPS (MÁXIMA PRECISÃO)
-        // ============================================
-        function startGPSTracking() {
-            if (isTracking) {
-                showToast('Aviso', 'Rastreamento já está ativo', 'warning');
-                return;
-            }
-
-            if (!navigator.geolocation) {
-                showToast('Erro', 'Seu navegador não suporta geolocalização', 'error');
-                return;
-            }
-
-            showToast('Iniciando GPS', 'Forçando sensor GPS para máxima precisão...', 'info');
-            updateGPSLockStatus('searching');
-
-            // ⚡ CONFIGURAÇÃO CRÍTICA PARA PRECISÃO MÁXIMA
-            const gpsOptions = {
-                enableHighAccuracy: true,  // 🔥 FORÇA O CHIP GPS DO SMARTPHONE
-                maximumAge: 0,              // ❌ SEM CACHE - SEMPRE DADOS NOVOS
-                timeout: 30000              // ⏱️ ESPERA ATÉ 30s PELO MELHOR SINAL
-            };
-
-            gpsWatchId = navigator.geolocation.watchPosition(
-                // ✅ SUCESSO - GPS OBTIDO
+            watchId = navigator.geolocation.watchPosition(
                 (position) => {
                     const accuracy = Math.round(position.coords.accuracy);
 
-                    // 🚫 FILTRO DE QUALIDADE - SÓ ACEITA PRECISÃO < 20m
                     if (accuracy > 20) {
-                        updateGPSLockStatus('searching', 0);
-                        showToast(
-                            'Sinal GPS Fraco',
-                            `Precisão atual: ${accuracy}m - Aguardando sinal melhor (< 20m)`,
-                            'warning'
-                        );
-                        return; // ❌ NÃO ENVIA DADOS RUINS PARA O FIREBASE
+                        showToast('<i class="fas fa-exclamation-triangle"></i>', `Precisão fraca: ${accuracy}m - Aguardando melhor sinal...`);
+                        return;
                     }
 
-                    // ✅ SINAL BOM - ATUALIZA TUDO
-                    updateGPSLockStatus('locked', Math.max(4, Math.floor(Math.random() * 8) + 4));
-
-                    const gpsData = {
+                    const data = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude,
                         accuracy: accuracy,
-                        speed: position.coords.speed ? position.coords.speed * 3.6 : 0, // m/s -> km/h
-                        heading: position.coords.heading || 0,
+                        speed: position.coords.speed ? position.coords.speed * 3.6 : 0,
                         timestamp: Date.now()
                     };
 
-                    // 📤 ENVIA PARA O FIREBASE
-                    database.ref('tracking/tecnico_01').set(gpsData);
-
-                    // 🗺️ BUSCA ENDEREÇO EXATO
-                    getExactAddress(gpsData.lat, gpsData.lng);
+                    db.ref('tracking/tecnico_01').set(data);
 
                     if (!isTracking) {
                         isTracking = true;
-                        document.getElementById('btn-start-tracking').disabled = true;
-                        document.getElementById('btn-stop-tracking').disabled = false;
-                        showToast('GPS Travado!', `Precisão: ${accuracy}m - Rastreamento ativo`, 'success');
+                        fabBtn.classList.add('recording');
+                        fabIcon.className = 'fas fa-stop';
+                        showToast('<i class="fas fa-check-circle"></i>', 'Rastreamento ativo!');
+                        requestWakeLock();
                     }
                 },
-                // ❌ ERRO NO GPS
                 (error) => {
-                    updateGPSLockStatus('error');
+                    gpsStatus.className = 'gps-indicator error';
+                    let msg = 'Erro ao acessar GPS';
 
-                    let errorMsg = 'Erro desconhecido ao acessar GPS';
+                    if (error.code === 1) msg = 'Permissão de localização negada';
+                    if (error.code === 2) msg = 'GPS indisponível';
 
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMsg = 'Você negou o acesso à localização. Permita nas configurações do navegador.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMsg = 'GPS indisponível. Verifique se está em área externa ou perto de janelas.';
-                            break;
-                        case error.TIMEOUT:
-                            errorMsg = 'Timeout ao buscar GPS. Tentando novamente...';
-                            break;
-                    }
-
-                    showToast('Erro no GPS', errorMsg, 'error');
-                    console.error('Erro GPS:', error);
+                    showToast('<i class="fas fa-times-circle"></i>', msg);
                 },
-                gpsOptions
+                options
             );
         }
 
-        function stopGPSTracking() {
-            if (gpsWatchId !== null) {
-                navigator.geolocation.clearWatch(gpsWatchId);
-                gpsWatchId = null;
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
                 isTracking = false;
-
-                updateGPSLockStatus('searching');
-
-                document.getElementById('btn-start-tracking').disabled = false;
-                document.getElementById('btn-stop-tracking').disabled = true;
-
-                showToast('Rastreamento Pausado', 'GPS desativado', 'info');
-            }
-        }
-
-        function centerMapOnTechnician() {
-            if (technicianMarker && leafletMap) {
-                leafletMap.setView(technicianMarker.getLatLng(), 20);
-                showToast('Centralizado!', 'Foco no técnico com zoom máximo', 'success');
-            } else {
-                showToast('Aviso', 'Nenhuma localização disponível ainda', 'warning');
+                fabBtn.classList.remove('recording');
+                fabIcon.className = 'fas fa-play';
+                gpsStatus.className = 'gps-indicator';
+                showToast('<i class="fas fa-pause-circle"></i>', 'Rastreamento pausado');
+                releaseWakeLock();
             }
         }
 
         // ============================================
-        // ESCUTA FIREBASE EM TEMPO REAL
+        // WAKE LOCK (MANTER TELA LIGADA)
         // ============================================
-        function listenToFirebaseUpdates() {
-            database.ref('tracking/tecnico_01').on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data || !leafletMap) return;
-
-                const { lat, lng, accuracy, speed, heading } = data;
-
-                // Atualiza UI
-                document.getElementById('lat-display').textContent = lat.toFixed(6);
-                document.getElementById('lng-display').textContent = lng.toFixed(6);
-                document.getElementById('accuracy-display').textContent = accuracy + ' m';
-                document.getElementById('header-accuracy').textContent = accuracy + 'm';
-
-                const speedKmh = speed.toFixed(1);
-                document.getElementById('speed-display').textContent = speedKmh + ' km/h';
-                document.getElementById('header-speed').textContent = speedKmh;
-                document.getElementById('speed-status').textContent = speed > 5 ? 'Em movimento' : 'Parado';
-
-                const now = new Date();
-                document.getElementById('last-update-time').textContent = now.toLocaleTimeString('pt-BR');
-
-                updateCount++;
-                document.getElementById('update-counter').textContent = updateCount;
-
-                updatePrecisionMeter(accuracy);
-
-                // Atualiza mapa
-                const position = [lat, lng];
-
-                if (!technicianMarker) {
-                    // Cria marcador customizado com ícone SVG
-                    const customIcon = L.divIcon({
-                        className: 'custom-marker',
-                        html: `
-                            <div style="position: relative; width: 30px; height: 30px;">
-                                <svg width="30" height="30" viewBox="0 0 30 30">
-                                    <circle cx="15" cy="15" r="14" fill="#ff6b00" stroke="#fff" stroke-width="3"/>
-                                    <circle cx="15" cy="15" r="5" fill="#fff"/>
-                                </svg>
-                                <div style="position: absolute; top: -35px; left: -40px; background: rgba(10, 14, 39, 0.95); 
-                                     color: #ff6b00; padding: 5px 10px; border-radius: 5px; white-space: nowrap; 
-                                     font-size: 11px; font-weight: 700; border: 1px solid #ff6b00;">
-                                    🎯 ${document.getElementById('technician-display').textContent}
-                                </div>
-                            </div>
-                        `,
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15]
-                    });
-
-                    technicianMarker = L.marker(position, { icon: customIcon }).addTo(leafletMap);
-
-                    // Círculo de precisão
-                    accuracyCircle = L.circle(position, {
-                        radius: accuracy,
-                        color: '#22c55e',
-                        fillColor: '#22c55e',
-                        fillOpacity: 0.15,
-                        weight: 2
-                    }).addTo(leafletMap);
-
-                    // Popup com informações
-                    technicianMarker.bindPopup(`
-                        <div style="font-family: Rajdhani, sans-serif; padding: 5px;">
-                            <h3 style="margin: 0 0 10px 0; color: #0a0e27; font-size: 14px;">
-                                🎯 ${document.getElementById('technician-display').textContent}
-                            </h3>
-                            <p style="margin: 3px 0; font-size: 12px;"><strong>Velocidade:</strong> ${speedKmh} km/h</p>
-                            <p style="margin: 3px 0; font-size: 12px;"><strong>Precisão:</strong> ${accuracy}m</p>
-                            <p style="margin: 3px 0; font-size: 11px; color: #666;">⏱️ ${now.toLocaleTimeString('pt-BR')}</p>
-                        </div>
-                    `);
-
-                    leafletMap.setView(position, 19);
-                } else {
-                    // Atualiza posição com animação suave
-                    technicianMarker.setLatLng(position);
-                    accuracyCircle.setLatLng(position);
-                    accuracyCircle.setRadius(accuracy);
-
-                    // Atualiza popup
-                    technicianMarker.setPopupContent(`
-                        <div style="font-family: Rajdhani, sans-serif; padding: 5px;">
-                            <h3 style="margin: 0 0 10px 0; color: #0a0e27; font-size: 14px;">
-                                🎯 ${document.getElementById('technician-display').textContent}
-                            </h3>
-                            <p style="margin: 3px 0; font-size: 12px;"><strong>Velocidade:</strong> ${speedKmh} km/h</p>
-                            <p style="margin: 3px 0; font-size: 12px;"><strong>Precisão:</strong> ${accuracy}m</p>
-                            <p style="margin: 3px 0; font-size: 11px; color: #666;">⏱️ ${now.toLocaleTimeString('pt-BR')}</p>
-                        </div>
-                    `);
-
-                    // Mantém centralização automática
-                    leafletMap.panTo(position);
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
                 }
-            });
+            } catch (err) {
+                console.log('Wake Lock não disponível:', err);
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+            }
         }
 
         // ============================================
-        // ELEMENTS SDK - CONFIGURAÇÃO EDITÁVEL
+        // TOAST NOTIFICATION
         // ============================================
-        async function onConfigChange(config) {
-            document.getElementById('system-title').textContent = config.system_title || defaultConfig.system_title;
-            document.getElementById('technician-display').textContent = config.technician_name || defaultConfig.technician_name;
-            document.getElementById('company-name').textContent = config.company_name || defaultConfig.company_name;
-            document.getElementById('alert-message').textContent = config.alert_message || defaultConfig.alert_message;
+        function showToast(icon, text) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
 
-            // Atualiza cores
-            const primaryColor = config.primary_color || defaultConfig.primary_color;
-            document.documentElement.style.setProperty('--primary-color', primaryColor);
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-icon">${icon}</div>
+                <div class="toast-text">${text}</div>
+            `;
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'slideUp 0.4s ease-out reverse';
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        fabBtn.addEventListener('click', () => {
+            if (isTracking) {
+                stopTracking();
+            } else {
+                startTracking();
+            }
+        });
+
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            if (map) map.zoomIn();
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            if (map) map.zoomOut();
+        });
+
+        document.getElementById('center-btn').addEventListener('click', () => {
+            if (marker && map) {
+                map.setView(marker.getLatLng(), 19);
+                showToast('<i class="fas fa-crosshairs"></i>', 'Centralizado!');
+            }
+        });
+
+        document.getElementById('clear-route').addEventListener('click', () => {
+            if (routePath) {
+                map.removeLayer(routePath);
+                routePath = null;
+                routeCoordinates = [];
+                showToast('<i class="fas fa-check-circle"></i>', 'Rota limpa!');
+            } else {
+                showToast('<i class="fas fa-info-circle"></i>', 'Nenhuma rota para limpar');
+            }
+        });
+
+        // ============================================
+        // ELEMENTS SDK
+        // ============================================
+        const defaultConfig = {
+            technician_name: 'Técnico 01'
+        };
+
+        async function onConfigChange(config) {
+            techName.textContent = config.technician_name || defaultConfig.technician_name;
         }
 
         if (window.elementSdk) {
             window.elementSdk.init({
                 defaultConfig: defaultConfig,
                 onConfigChange: onConfigChange,
-                mapToCapabilities: (config) => ({
-                    recolorables: [
-                        {
-                            get: () => config.primary_color || defaultConfig.primary_color,
-                            set: (value) => {
-                                config.primary_color = value;
-                                window.elementSdk.setConfig({ primary_color: value });
-                            }
-                        }
-                    ],
+                mapToCapabilities: () => ({
+                    recolorables: [],
                     borderables: [],
                     fontEditable: undefined,
                     fontSizeable: undefined
                 }),
                 mapToEditPanelValues: (config) => new Map([
-                    ["system_title", config.system_title || defaultConfig.system_title],
-                    ["technician_name", config.technician_name || defaultConfig.technician_name],
-                    ["company_name", config.company_name || defaultConfig.company_name],
-                    ["alert_message", config.alert_message || defaultConfig.alert_message]
+                    ["technician_name", config.technician_name || defaultConfig.technician_name]
                 ])
             });
         }
 
         // ============================================
-        // EVENT LISTENERS
-        // ============================================
-        document.getElementById('btn-start-tracking').addEventListener('click', startGPSTracking);
-        document.getElementById('btn-stop-tracking').addEventListener('click', stopGPSTracking);
-        document.getElementById('btn-center-map').addEventListener('click', centerMapOnTechnician);
-
-        // ============================================
-        // INICIALIZAÇÃO
+        // INICIALIZAR
         // ============================================
         window.addEventListener('load', () => {
-            initLeafletMap();
+            initMap();
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bd74cd8b579c58a',t:'MTc2ODMzMjU0My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bd76cb9b374f177',t:'MTc2ODMzMzg0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
