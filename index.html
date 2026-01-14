@@ -417,10 +417,11 @@
             font-size: 14px;
             color: #000000;
             box-shadow: 0 4px 20px rgba(212, 194, 154, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
         .marker-rotatable {
-            transition: transform 0.3s ease;
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
         .marker-label {
@@ -705,6 +706,12 @@
         let isCompassAvailable = false;
         let currentAltitude = null;
         let currentTilt = 0;
+        
+        // Filtro de suavização para rotação
+        let headingHistory = [];
+        const HEADING_SMOOTHING = 5; // Quantidade de amostras para média móvel
+        let lastUpdateTime = 0;
+        const UPDATE_THRESHOLD = 100; // Atualizar apenas a cada 100ms
 
         // ============================================
         // ELEMENTOS DOM
@@ -846,25 +853,68 @@
         // ATUALIZAR BÚSSOLA E MARCADOR
         // ============================================
         function updateCompass(heading) {
+            // Throttle: atualizar apenas a cada 100ms
+            const now = Date.now();
+            if (now - lastUpdateTime < UPDATE_THRESHOLD) return;
+            lastUpdateTime = now;
+            
             // Normalizar ângulo (0-360)
             heading = (heading + 360) % 360;
-            currentHeading = heading;
+            
+            // Adicionar ao histórico
+            headingHistory.push(heading);
+            if (headingHistory.length > HEADING_SMOOTHING) {
+                headingHistory.shift();
+            }
+            
+            // Calcular média móvel com tratamento de wrap-around (0°/360°)
+            let smoothedHeading = calculateCircularMean(headingHistory);
+            
+            // Aplicar deadzone: só atualizar se diferença for > 3 graus
+            const diff = Math.abs(smoothedHeading - currentHeading);
+            if (diff < 3 && diff !== 0) return;
+            
+            currentHeading = smoothedHeading;
             
             // Rotacionar ícone da bússola
-            compassIcon.style.transform = `rotate(${heading}deg)`;
+            compassIcon.style.transform = `rotate(${smoothedHeading}deg)`;
             
             // Determinar direção cardeal
-            const direction = getCardinalDirection(heading);
+            const direction = getCardinalDirection(smoothedHeading);
             compassDirection = direction;
             compassDirectionEl.textContent = direction;
             
             // Atualizar valor numérico
-            headingValue.textContent = `${Math.round(heading)}°`;
+            headingValue.textContent = `${Math.round(smoothedHeading)}°`;
             
             // Rotacionar marcador no mapa
             if (marker) {
-                updateMarkerRotation(heading);
+                updateMarkerRotation(smoothedHeading);
             }
+        }
+        
+        // ============================================
+        // CALCULAR MÉDIA CIRCULAR (para ângulos)
+        // ============================================
+        function calculateCircularMean(angles) {
+            let sinSum = 0;
+            let cosSum = 0;
+            
+            angles.forEach(angle => {
+                const rad = angle * Math.PI / 180;
+                sinSum += Math.sin(rad);
+                cosSum += Math.cos(rad);
+            });
+            
+            const avgSin = sinSum / angles.length;
+            const avgCos = cosSum / angles.length;
+            
+            let meanAngle = Math.atan2(avgSin, avgCos) * 180 / Math.PI;
+            
+            // Normalizar para 0-360
+            if (meanAngle < 0) meanAngle += 360;
+            
+            return meanAngle;
         }
 
         // ============================================
@@ -1373,5 +1423,5 @@
             }, 1000);
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdf3d4d72c3261c',t:'MTc2ODQxNTc5Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdf41d6a619261c',t:'MTc2ODQxNTk3OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
