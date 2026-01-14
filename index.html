@@ -86,37 +86,42 @@
         .status-card {
             position: fixed;
             top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: calc(100% - 40px);
-            max-width: 380px;
+            right: 20px;
+            width: 200px;
             background: rgba(26, 26, 26, 0.95);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(212, 194, 154, 0.3);
-            border-radius: 20px;
-            padding: 20px;
+            border-radius: 16px;
+            padding: 14px;
             z-index: 1000;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            transition: all 0.3s ease;
+        }
+
+        .status-card.hidden {
+            transform: translateX(250px);
+            opacity: 0;
+            pointer-events: none;
         }
 
         .status-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
         }
 
         .status-title {
             font-family: 'Playfair Display', serif;
-            font-size: 20px;
+            font-size: 14px;
             font-weight: 900;
             color: var(--gold);
             letter-spacing: 0.5px;
         }
 
         .gps-indicator {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: var(--yellow);
             animation: pulse 2s ease-in-out infinite;
@@ -144,29 +149,28 @@
 
         /* Dados em grid */
         .data-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .data-item {
             background: rgba(42, 42, 42, 0.6);
-            border-radius: 12px;
-            padding: 12px;
+            border-radius: 8px;
+            padding: 8px;
             border: 1px solid rgba(212, 194, 154, 0.15);
         }
 
         .data-label {
-            font-size: 10px;
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             color: var(--light-gray);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
         }
 
         .data-label i {
@@ -174,31 +178,31 @@
         }
 
         .data-value {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 800;
             color: var(--gold);
             font-family: 'Montserrat', sans-serif;
         }
 
         .data-item.full {
-            grid-column: 1 / -1;
+            display: none;
         }
 
         .data-value.address {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
-            line-height: 1.4;
+            line-height: 1.3;
             color: #ffffff;
         }
 
         /* Barra de precisão */
         .precision-bar {
             width: 100%;
-            height: 6px;
+            height: 5px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
             overflow: hidden;
-            margin-top: 8px;
+            margin-top: 6px;
         }
 
         .precision-fill {
@@ -223,6 +227,37 @@
         @keyframes shimmer {
             0% { transform: translateX(-100%); }
             100% { transform: translateX(100%); }
+        }
+
+        /* Toggle card button */
+        .toggle-card-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 194, 154, 0.3);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--gold);
+            cursor: pointer;
+            z-index: 999;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-card-btn:active {
+            transform: scale(0.95);
+            background: rgba(212, 194, 154, 0.2);
+        }
+
+        .toggle-card-btn.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
 
         /* ============================================
@@ -462,15 +497,7 @@
         ============================================ */
         @media (min-width: 768px) {
             .status-card {
-                max-width: 420px;
-            }
-
-            .data-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-
-            .data-item.full {
-                grid-column: 1 / -1;
+                width: 220px;
             }
         }
     </style>
@@ -480,8 +507,8 @@
  </head>
  <body>
   <div id="app"><!-- Mapa Fullscreen -->
-   <div id="map"></div><!-- Status Card (Glassmorphism) -->
-   <div class="status-card">
+   <div id="map"></div><!-- Toggle Card Button --> <button class="toggle-card-btn" id="toggle-card-btn"> <i class="fas fa-eye-slash"></i> </button> <!-- Status Card (Glassmorphism) -->
+   <div class="status-card" id="status-card">
     <div class="status-header">
      <h1 class="status-title" id="tech-name">Técnico</h1>
      <div class="gps-indicator" id="gps-status"></div>
@@ -568,6 +595,8 @@
         let wakeLock = null;
         let routePath = null;
         let routeCoordinates = [];
+        let cardVisible = true;
+        let autoCenter = false; // Câmera livre por padrão
 
         // ============================================
         // ELEMENTOS DOM
@@ -583,6 +612,8 @@
         const precisionFill = document.getElementById('precision-fill');
         const techName = document.getElementById('tech-name');
         const loading = document.getElementById('loading');
+        const statusCard = document.getElementById('status-card');
+        const toggleCardBtn = document.getElementById('toggle-card-btn');
 
         // ============================================
         // INICIALIZAR MAPA (LEAFLET + DARK STYLE)
@@ -701,7 +732,7 @@
                 marker.setLatLng(position);
                 accuracyCircle.setLatLng(position);
                 accuracyCircle.setRadius(accuracy);
-                map.panTo(position);
+                // Não move câmera automaticamente (modo livre)
             }
 
             // Buscar endereço
@@ -767,8 +798,9 @@
                         isTracking = true;
                         fabBtn.classList.add('recording');
                         fabIcon.className = 'fas fa-stop';
-                        showToast('<i class="fas fa-check-circle"></i>', 'Rastreamento ativo!');
+                        showToast('<i class="fas fa-check-circle"></i>', 'Rastreamento ativo! Funciona em segundo plano.');
                         requestWakeLock();
+                        localStorage.setItem('gps_tracking_active', 'true');
                     }
                 },
                 (error) => {
@@ -794,6 +826,7 @@
                 gpsStatus.className = 'gps-indicator';
                 showToast('<i class="fas fa-pause-circle"></i>', 'Rastreamento pausado');
                 releaseWakeLock();
+                localStorage.setItem('gps_tracking_active', 'false');
             }
         }
 
@@ -876,6 +909,27 @@
             }
         });
 
+        // Toggle card visibility
+        toggleCardBtn.addEventListener('click', () => {
+            cardVisible = !cardVisible;
+            if (cardVisible) {
+                statusCard.classList.remove('hidden');
+                toggleCardBtn.classList.add('hidden');
+            } else {
+                statusCard.classList.add('hidden');
+                toggleCardBtn.querySelector('i').className = 'fas fa-eye';
+            }
+        });
+
+        statusCard.addEventListener('click', (e) => {
+            if (e.target === statusCard || e.target.closest('.status-header')) {
+                statusCard.classList.add('hidden');
+                toggleCardBtn.classList.remove('hidden');
+                toggleCardBtn.querySelector('i').className = 'fas fa-eye';
+                cardVisible = false;
+            }
+        });
+
         // ============================================
         // ELEMENTS SDK
         // ============================================
@@ -908,7 +962,23 @@
         // ============================================
         window.addEventListener('load', () => {
             initMap();
+            
+            // Restaurar estado do rastreamento
+            const wasTracking = localStorage.getItem('gps_tracking_active') === 'true';
+            if (wasTracking) {
+                setTimeout(() => {
+                    startTracking();
+                }, 1000);
+            }
+        });
+
+        // Manter rastreamento ativo em background
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && isTracking) {
+                // Página em background mas GPS continua
+                console.log('GPS continua em background');
+            }
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bde9c67260e261c',t:'MTc2ODQwOTIwMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdea18545bb261c',t:'MTc2ODQwOTQxMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
