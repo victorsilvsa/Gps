@@ -233,6 +233,25 @@
             transition: width 0.4s ease, background 0.4s ease;
         }
 
+        /* ===== COMPASS DISPLAY ===== */
+        .compass-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .compass-icon {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .direction-text {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            min-width: 30px;
+        }
+
         /* ===== FAB BUTTON (Mobile Friendly) ===== */
         .fab-button {
             position: fixed;
@@ -303,7 +322,7 @@
             background: rgba(0, 255, 136, 0.1);
         }
 
-        /* ===== MARCADOR CUSTOMIZADO ===== */
+        /* ===== MARCADOR CUSTOMIZADO COM ROTAÇÃO ===== */
         .custom-marker {
             position: relative;
             width: 50px;
@@ -393,6 +412,11 @@
             border-bottom: 10px solid var(--primary);
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
             z-index: 3;
+            transition: transform 0.3s ease;
+        }
+
+        .marker-rotatable {
+            transition: transform 0.3s ease;
         }
 
         .marker-label {
@@ -565,6 +589,40 @@
      </div>
      <div class="data-item">
       <div class="data-label">
+       Bússola
+      </div>
+      <div class="compass-display"><i class="fas fa-compass compass-icon" id="compass-icon"></i>
+       <div class="direction-text" id="compass-direction">
+        N
+       </div>
+      </div>
+     </div>
+     <div class="data-item">
+      <div class="data-label">
+       Direção
+      </div>
+      <div class="data-value" id="heading-value">
+       -- °
+      </div>
+     </div>
+     <div class="data-item">
+      <div class="data-label">
+       Altitude
+      </div>
+      <div class="data-value" id="altitude-value">
+       -- m
+      </div>
+     </div>
+     <div class="data-item">
+      <div class="data-label">
+       Inclinação
+      </div>
+      <div class="data-value" id="tilt-value">
+       -- °
+      </div>
+     </div>
+     <div class="data-item">
+      <div class="data-label">
        Latitude
       </div>
       <div class="data-value coords" id="lat-value">
@@ -630,6 +688,14 @@
         let geocodeTimeout = null;
         let lastToastMessage = '';
         let toastTimeout = null;
+        
+        // Sensores de orientação e movimento
+        let currentHeading = 0;
+        let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
+        let compassDirection = 'N';
+        let isCompassAvailable = false;
+        let currentAltitude = null;
+        let currentTilt = 0;
 
         // ============================================
         // ELEMENTOS DOM
@@ -647,9 +713,152 @@
         const loading = document.getElementById('loading');
         const statusCard = document.getElementById('status-card');
         const toggleCardBtn = document.getElementById('toggle-card');
+        const compassIcon = document.getElementById('compass-icon');
+        const compassDirectionEl = document.getElementById('compass-direction');
+        const headingValue = document.getElementById('heading-value');
+        const altitudeValue = document.getElementById('altitude-value');
+        const tiltValue = document.getElementById('tilt-value');
 
         // ============================================
-        // INICIALIZAR MAPA (Câmera Livre)
+        // INICIALIZAR SENSORES
+        // ============================================
+        function initSensors() {
+            // Requisitar permissão para sensores (iOS 13+)
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            enableOrientationSensors();
+                        } else {
+                            showToast('<i class="fas fa-exclamation-triangle"></i>', 'Permissão de sensores negada');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Android e navegadores que não precisam de permissão
+                enableOrientationSensors();
+            }
+        }
+
+        function enableOrientationSensors() {
+            // Bússola e Orientação (DeviceOrientationEvent)
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientation, true);
+                window.addEventListener('deviceorientationabsolute', handleOrientationAbsolute, true);
+                isCompassAvailable = true;
+                showToast('<i class="fas fa-compass"></i>', 'Bússola e sensores ativados! 🧭');
+            }
+
+            // Acelerômetro (DeviceMotionEvent)
+            if (window.DeviceMotionEvent) {
+                window.addEventListener('devicemotion', handleMotion, true);
+            }
+        }
+
+        // ============================================
+        // PROCESSAR ORIENTAÇÃO (Bússola)
+        // ============================================
+        function handleOrientationAbsolute(event) {
+            if (event.absolute && event.alpha !== null) {
+                // Alpha é o ângulo de rotação em relação ao Norte
+                currentHeading = event.alpha;
+                updateCompass(currentHeading);
+            }
+        }
+
+        function handleOrientation(event) {
+            // Fallback para dispositivos sem orientação absoluta
+            if (!isCompassAvailable || event.alpha === null) return;
+            
+            deviceOrientation.alpha = event.alpha || 0; // Rotação Z (bússola)
+            deviceOrientation.beta = event.beta || 0;   // Rotação X (frente/trás)
+            deviceOrientation.gamma = event.gamma || 0; // Rotação Y (esquerda/direita)
+            
+            // Se não temos orientação absoluta, usar alpha relativo
+            if (currentHeading === 0) {
+                currentHeading = deviceOrientation.alpha;
+                updateCompass(currentHeading);
+            }
+            
+            // Calcular inclinação do dispositivo
+            currentTilt = Math.round(Math.abs(deviceOrientation.beta));
+            tiltValue.textContent = `${currentTilt}°`;
+        }
+
+        // ============================================
+        // PROCESSAR MOVIMENTO (Acelerômetro)
+        // ============================================
+        function handleMotion(event) {
+            // Capturar dados de aceleração (útil para detectar movimento brusco, freadas, etc)
+            if (event.acceleration) {
+                const acceleration = {
+                    x: event.acceleration.x,
+                    y: event.acceleration.y,
+                    z: event.acceleration.z
+                };
+                
+                // Pode usar para detectar freadas bruscas, acidentes, etc
+                // (Implementação futura se necessário)
+            }
+        }
+
+        // ============================================
+        // ATUALIZAR BÚSSOLA E MARCADOR
+        // ============================================
+        function updateCompass(heading) {
+            // Normalizar ângulo (0-360)
+            heading = (heading + 360) % 360;
+            currentHeading = heading;
+            
+            // Rotacionar ícone da bússola
+            compassIcon.style.transform = `rotate(${heading}deg)`;
+            
+            // Determinar direção cardeal
+            const direction = getCardinalDirection(heading);
+            compassDirection = direction;
+            compassDirectionEl.textContent = direction;
+            
+            // Atualizar valor numérico
+            headingValue.textContent = `${Math.round(heading)}°`;
+            
+            // Rotacionar marcador no mapa
+            if (marker) {
+                updateMarkerRotation(heading);
+            }
+        }
+
+        // ============================================
+        // CONVERTER ÂNGULO PARA DIREÇÃO CARDEAL
+        // ============================================
+        function getCardinalDirection(angle) {
+            const directions = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+            const index = Math.round(angle / 45) % 8;
+            return directions[index];
+        }
+
+        // ============================================
+        // ROTACIONAR MARCADOR NO MAPA
+        // ============================================
+        function updateMarkerRotation(heading) {
+            const markerElement = marker.getElement();
+            if (!markerElement) return;
+            
+            const direction = markerElement.querySelector('.marker-direction');
+            const icon = markerElement.querySelector('.marker-icon');
+            
+            if (direction) {
+                // Rotacionar seta de direção
+                direction.style.transform = `translateX(-50%) rotate(${heading}deg)`;
+            }
+            
+            if (icon) {
+                // Rotacionar ícone interno levemente
+                icon.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
+            }
+        }
+
+        // ============================================
+        // INICIALIZAR MAPA
         // ============================================
         function initMap() {
             map = L.map('map', {
@@ -657,7 +866,6 @@
                 zoom: 16,
                 zoomControl: false,
                 attributionControl: false,
-                // Desabilitar auto-pan ao interagir
                 touchZoom: true,
                 scrollWheelZoom: true,
                 doubleClickZoom: true,
@@ -666,63 +874,67 @@
                 dragging: true
             });
 
-            // Dark tiles com melhor contraste
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 maxZoom: 20,
                 subdomains: 'abcd'
             }).addTo(map);
 
-            // Detectar quando usuário move o mapa manualmente
             map.on('dragstart', () => {
-                isCameraLocked = true; // Marca que usuário moveu manualmente
+                isCameraLocked = true;
             });
 
-            // Escutar Firebase
             db.ref('tracking/tecnico_01').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) updateUI(data);
             });
 
             loading.style.display = 'none';
+            
+            // Inicializar sensores
+            initSensors();
         }
 
         // ============================================
-        // ATUALIZAR UI COM DADOS GPS (Lógica Melhorada)
+        // ATUALIZAR UI COM DADOS GPS
         // ============================================
         function updateUI(data) {
-            const { lat, lng, accuracy, speed } = data;
+            const { lat, lng, accuracy, speed, altitude, heading } = data;
 
-            // Validação de dados
             if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
 
-            // Atualizar valores
             accuracyValue.textContent = `${Math.round(accuracy)}m`;
             speedValue.textContent = `${Math.round(speed)} km/h`;
             latValue.textContent = lat.toFixed(6);
             lngValue.textContent = lng.toFixed(6);
+            
+            // Atualizar altitude
+            if (altitude !== null && altitude !== undefined) {
+                currentAltitude = altitude;
+                altitudeValue.textContent = `${Math.round(altitude)}m`;
+            } else {
+                altitudeValue.textContent = '-- m';
+            }
+            
+            // Se GPS fornece heading, usar ele
+            if (heading !== null && heading !== undefined) {
+                updateCompass(heading);
+            }
 
-            // Barra de precisão otimizada
             updatePrecisionBar(accuracy);
-
-            // Status GPS baseado em precisão
             updateGPSStatus(accuracy);
 
             const position = [lat, lng];
 
-            // Adicionar à rota se estiver rastreando
             if (isTracking) {
                 updateRoute(position);
             }
 
-            // Atualizar ou criar marcador
             updateMarker(position, accuracy);
 
-            // Centralizar câmera apenas se não foi movida manualmente
             if (!isCameraLocked && marker) {
                 map.setView(position, map.getZoom(), { animate: true });
             }
 
-            // Buscar endere��o com debounce
             debouncedGetAddress(lat, lng);
 
             lastPosition = position;
@@ -770,10 +982,9 @@
         // ATUALIZAR ROTA
         // ============================================
         function updateRoute(position) {
-            // Adicionar TODOS os pontos com filtro ultra-mínimo de 0.5m para precisão cirúrgica
             if (lastPosition) {
                 const distance = map.distance(lastPosition, position);
-                if (distance < 0.5) return; // Filtro de 0.5m para capturar cada movimento
+                if (distance < 0.5) return;
             }
 
             routeCoordinates.push(position);
@@ -783,7 +994,7 @@
                     color: '#D4C29A',
                     weight: 4,
                     opacity: 0.85,
-                    smoothFactor: 0.5, // Menos suavização = mais precisão
+                    smoothFactor: 0.5,
                     lineCap: 'round',
                     lineJoin: 'round'
                 }).addTo(map);
@@ -804,7 +1015,7 @@
                         <div class="marker-pulse-2"></div>
                         <div class="marker-outer-ring"></div>
                         <div class="marker-direction"></div>
-                        <div class="marker-icon"><i class="fas fa-location-crosshairs"></i></div>
+                        <div class="marker-icon"><i class="fas fa-location-arrow"></i></div>
                         <div class="marker-label">${techName.textContent}</div>
                     `,
                     iconSize: [50, 50],
@@ -824,6 +1035,11 @@
                 marker.setLatLng(position);
                 accuracyCircle.setLatLng(position);
                 accuracyCircle.setRadius(accuracy);
+            }
+            
+            // Aplicar rotação atual
+            if (currentHeading > 0) {
+                updateMarkerRotation(currentHeading);
             }
         }
 
@@ -856,19 +1072,18 @@
         }
 
         // ============================================
-        // CONTROLE DE RASTREAMENTO (Lógica Melhorada)
+        // CONTROLE DE RASTREAMENTO
         // ============================================
         function startTracking() {
             if (isTracking) return;
 
-            showToast('<i class="fas fa-satellite"></i>', 'Ativando GPS de máxima precisão...');
+            showToast('<i class="fas fa-satellite"></i>', 'Ativando GPS + Sensores...');
             gpsStatus.className = 'gps-indicator';
 
-            // Configurações extremas para máxima precisão
             const options = {
                 enableHighAccuracy: true,
-                maximumAge: 0, // Nunca usar cache
-                timeout: 30000 // Mais tempo para obter sinal preciso
+                maximumAge: 0,
+                timeout: 30000
             };
 
             watchId = navigator.geolocation.watchPosition(
@@ -881,30 +1096,27 @@
         function handlePositionSuccess(position) {
             const accuracy = Math.round(position.coords.accuracy);
 
-            // Aceitar apenas precisão EXCELENTE (até 15m) para garantir qualidade máxima
             if (accuracy > 15) {
-                // Mostrar toast apenas se for diferente do último OU passou tempo suficiente
                 const message = `Precisão: ${accuracy}m - Aguarde...`;
                 if (lastToastMessage !== message) {
                     showToast('<i class="fas fa-exclamation-triangle"></i>', message, 5000);
                     lastToastMessage = message;
                 }
-                // Continuar tentando mas não salvar dados imprecisos
                 return;
             }
 
-            // Limpar mensagem de busca quando conseguir sinal bom
             lastToastMessage = '';
 
-            // Dados GPS brutos com informações extras
             const data = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude,
                 accuracy: accuracy,
                 speed: position.coords.speed ? position.coords.speed * 3.6 : 0,
-                heading: position.coords.heading || null,
-                altitude: position.coords.altitude || null,
-                altitudeAccuracy: position.coords.altitudeAccuracy || null,
+                heading: position.coords.heading || currentHeading, // Usar heading do GPS ou bússola
+                altitude: position.coords.altitude,
+                altitudeAccuracy: position.coords.altitudeAccuracy,
+                compass_direction: compassDirection,
+                device_tilt: currentTilt,
                 timestamp: Date.now()
             };
 
@@ -975,10 +1187,9 @@
         // TOAST NOTIFICATION
         // ============================================
         function showToast(icon, text, duration = 3000) {
-            // Evitar duplicatas
             const existing = document.querySelector('.toast');
             if (existing && existing.querySelector('.toast-text').textContent === text) {
-                return; // Não mostrar se já está exibindo a mesma mensagem
+                return;
             }
             
             if (existing) existing.remove();
@@ -1030,7 +1241,7 @@
 
         document.getElementById('center-btn').addEventListener('click', () => {
             if (marker && map) {
-                isCameraLocked = false; // Libera para seguir automaticamente novamente
+                isCameraLocked = false;
                 map.setView(marker.getLatLng(), 18, { animate: true });
                 showToast('<i class="fas fa-crosshairs"></i>', 'Centralizado! Câmera livre.');
             }
@@ -1057,7 +1268,6 @@
         async function onConfigChange(config) {
             techName.textContent = config.technician_name || defaultConfig.technician_name;
             
-            // Atualizar label do marcador se existir
             if (marker) {
                 const newLabel = config.technician_name || defaultConfig.technician_name;
                 const customIcon = L.divIcon({
@@ -1067,7 +1277,7 @@
                         <div class="marker-pulse-2"></div>
                         <div class="marker-outer-ring"></div>
                         <div class="marker-direction"></div>
-                        <div class="marker-icon"><i class="fas fa-location-crosshairs"></i></div>
+                        <div class="marker-icon"><i class="fas fa-location-arrow"></i></div>
                         <div class="marker-label">${newLabel}</div>
                     `,
                     iconSize: [50, 50],
@@ -1100,5 +1310,5 @@
             initMap();
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdeea6387d04c86',t:'MTc2ODQxMjM5Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdef915f103cd97',t:'MTc2ODQxMjk5OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
