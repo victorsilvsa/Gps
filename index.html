@@ -628,6 +628,8 @@
         let lastPosition = null;
         let isCameraLocked = false;
         let geocodeTimeout = null;
+        let lastToastMessage = '';
+        let toastTimeout = null;
 
         // ============================================
         // ELEMENTOS DOM
@@ -672,7 +674,7 @@
 
             // Detectar quando usuário move o mapa manualmente
             map.on('dragstart', () => {
-                isCameraLocked = false;
+                isCameraLocked = true; // Marca que usuário moveu manualmente
             });
 
             // Escutar Firebase
@@ -881,10 +883,18 @@
 
             // Aceitar apenas precisão EXCELENTE (até 15m) para garantir qualidade máxima
             if (accuracy > 15) {
-                showToast('<i class="fas fa-exclamation-triangle"></i>', `Precisão: ${accuracy}m - Buscando melhor sinal...`);
+                // Mostrar toast apenas se for diferente do último OU passou tempo suficiente
+                const message = `Precisão: ${accuracy}m - Aguarde...`;
+                if (lastToastMessage !== message) {
+                    showToast('<i class="fas fa-exclamation-triangle"></i>', message, 5000);
+                    lastToastMessage = message;
+                }
                 // Continuar tentando mas não salvar dados imprecisos
                 return;
             }
+
+            // Limpar mensagem de busca quando conseguir sinal bom
+            lastToastMessage = '';
 
             // Dados GPS brutos com informações extras
             const data = {
@@ -904,7 +914,7 @@
                 isTracking = true;
                 fabBtn.classList.add('recording');
                 fabIcon.className = 'fas fa-stop';
-                showToast('<i class="fas fa-check-circle"></i>', `Rastreamento ativo! Precisão: ${accuracy}m`);
+                showToast('<i class="fas fa-check-circle"></i>', `Rastreamento ativo! Precisão: ${accuracy}m`, 3000);
                 requestWakeLock();
             }
         }
@@ -964,8 +974,13 @@
         // ============================================
         // TOAST NOTIFICATION
         // ============================================
-        function showToast(icon, text) {
+        function showToast(icon, text, duration = 3000) {
+            // Evitar duplicatas
             const existing = document.querySelector('.toast');
+            if (existing && existing.querySelector('.toast-text').textContent === text) {
+                return; // Não mostrar se já está exibindo a mesma mensagem
+            }
+            
             if (existing) existing.remove();
 
             const toast = document.createElement('div');
@@ -977,10 +992,11 @@
 
             document.body.appendChild(toast);
 
-            setTimeout(() => {
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
                 toast.style.opacity = '0';
                 setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            }, duration);
         }
 
         // ============================================
@@ -1014,9 +1030,9 @@
 
         document.getElementById('center-btn').addEventListener('click', () => {
             if (marker && map) {
-                isCameraLocked = false;
+                isCameraLocked = false; // Libera para seguir automaticamente novamente
                 map.setView(marker.getLatLng(), 18, { animate: true });
-                showToast('<i class="fas fa-crosshairs"></i>', 'Centralizado!');
+                showToast('<i class="fas fa-crosshairs"></i>', 'Centralizado! Câmera livre.');
             }
         });
 
@@ -1084,5 +1100,5 @@
             initMap();
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdee3cc453d261c',t:'MTc2ODQxMjEyNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdeea6387d04c86',t:'MTc2ODQxMjM5Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
