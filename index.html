@@ -252,41 +252,60 @@
             min-width: 30px;
         }
 
-        /* ===== FAB BUTTON (Mobile Friendly) ===== */
-        .fab-button {
+        /* ===== STATUS BADGE (Auto-tracking) ===== */
+        .status-badge {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 64px;
-            height: 64px;
-            background: var(--primary);
-            border: none;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: #000000;
-            cursor: pointer;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            background: var(--bg-overlay);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
             z-index: 1000;
-            box-shadow: 0 4px 24px rgba(212, 194, 154, 0.4);
-            transition: all 0.2s ease;
-            touch-action: manipulation;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 56px;
         }
 
-        .fab-button:active {
-            transform: scale(0.92);
+        .status-badge-icon {
+            font-size: 24px;
+            color: var(--primary);
         }
 
-        .fab-button.recording {
-            background: var(--red);
-            box-shadow: 0 4px 24px rgba(255, 51, 102, 0.5);
-            animation: pulse-red 1.5s ease-in-out infinite;
+        .status-badge.active .status-badge-icon {
+            animation: pulse-icon 2s ease-in-out infinite;
         }
 
-        @keyframes pulse-red {
-            0%, 100% { box-shadow: 0 4px 24px rgba(255, 51, 102, 0.5); }
-            50% { box-shadow: 0 4px 32px rgba(255, 51, 102, 0.8); }
+        .status-badge.error .status-badge-icon {
+            color: var(--red);
+        }
+
+        @keyframes pulse-icon {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .status-badge-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .status-badge.active .status-badge-text {
+            color: var(--primary);
+        }
+
+        .status-badge.error .status-badge-text {
+            color: var(--red);
         }
 
         /* ===== ZOOM CONTROLS (Mobile Optimized) ===== */
@@ -398,21 +417,6 @@
             font-size: 14px;
             color: #000000;
             box-shadow: 0 4px 20px rgba(212, 194, 154, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-        }
-
-        .marker-direction {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-bottom: 10px solid var(--primary);
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
-            z-index: 3;
-            transition: transform 0.3s ease;
-            transform-origin: 50% 75%;
         }
 
         .marker-rotatable {
@@ -646,7 +650,12 @@
       </div>
      </div>
     </div>
-   </div><!-- FAB Button --> <button class="fab-button" id="fab-btn" aria-label="Iniciar rastreamento"> <i class="fas fa-play" id="fab-icon"></i> </button> <!-- Zoom Controls -->
+   </div><!-- Status Badge (Auto-tracking) -->
+   <div class="status-badge" id="tracking-status"><i class="fas fa-satellite-dish status-badge-icon"></i>
+    <div class="status-badge-text">
+     Aguarde
+    </div>
+   </div><!-- Zoom Controls -->
    <div class="zoom-controls"><button class="zoom-btn" id="zoom-in" aria-label="Aproximar"> <i class="fas fa-plus"></i> </button> <button class="zoom-btn" id="zoom-out" aria-label="Afastar"> <i class="fas fa-minus"></i> </button> <button class="zoom-btn" id="center-btn" aria-label="Centralizar"> <i class="fas fa-crosshairs"></i> </button> <button class="zoom-btn" id="clear-route" aria-label="Limpar rota"> <i class="fas fa-trash-alt"></i> </button>
    </div><!-- Loading -->
    <div class="loading" id="loading">
@@ -700,8 +709,7 @@
         // ============================================
         // ELEMENTOS DOM
         // ============================================
-        const fabBtn = document.getElementById('fab-btn');
-        const fabIcon = document.getElementById('fab-icon');
+        const trackingStatus = document.getElementById('tracking-status');
         const gpsStatus = document.getElementById('gps-status');
         const accuracyValue = document.getElementById('accuracy-value');
         const speedValue = document.getElementById('speed-value');
@@ -756,22 +764,26 @@
         }
 
         // ============================================
-        // PROCESSAR ORIENTAÇÃO (Bússola)
+        // PROCESSAR ORIENTAÇÃO (Bússola) - API NATIVA DO CELULAR
         // ============================================
         function handleOrientationAbsolute(event) {
             if (event.absolute && event.alpha !== null) {
-                // Corrigir para Norte magnético real
-                let heading = event.alpha;
-                
-                // webkitCompassHeading (iOS Safari) já está corrigido para norte magnético
-                if (event.webkitCompassHeading !== undefined) {
-                    heading = event.webkitCompassHeading;
-                } else {
-                    // Android: alpha precisa ser invertido (360 - alpha)
-                    heading = 360 - event.alpha;
+                // webkitCompassHeading (iOS) - API NATIVA da bússola do iPhone
+                if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+                    currentHeading = event.webkitCompassHeading;
+                    updateCompass(currentHeading);
+                    return;
                 }
                 
-                currentHeading = heading;
+                // Android: usar webkitCompassAccuracy se disponível
+                if (event.webkitCompassAccuracy !== undefined) {
+                    currentHeading = 360 - event.alpha;
+                    updateCompass(currentHeading);
+                    return;
+                }
+                
+                // Fallback: alpha invertido
+                currentHeading = 360 - event.alpha;
                 updateCompass(currentHeading);
             }
         }
@@ -783,18 +795,32 @@
             deviceOrientation.beta = event.beta || 0;
             deviceOrientation.gamma = event.gamma || 0;
             
-            // iOS: webkitCompassHeading é o valor real do norte magnético
-            if (event.webkitCompassHeading !== undefined) {
+            // PRIORIDADE 1: webkitCompassHeading (API NATIVA iOS)
+            // Esta é a bússola magnética REAL do iPhone/iPad
+            if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
                 currentHeading = event.webkitCompassHeading;
                 updateCompass(currentHeading);
-            } else if (event.absolute) {
-                // Android com orientação absoluta
+            } 
+            // PRIORIDADE 2: compassHeading (API Android nativa)
+            else if (event.compassHeading !== undefined && event.compassHeading !== null) {
+                currentHeading = event.compassHeading;
+                updateCompass(currentHeading);
+            }
+            // PRIORIDADE 3: Absolute orientation (sensor de orientação)
+            else if (event.absolute && event.alpha !== null) {
+                // Android: inverter alpha para norte magnético
+                let heading = 360 - event.alpha;
+                currentHeading = heading;
+                updateCompass(currentHeading);
+            }
+            // FALLBACK: alpha padrão invertido
+            else if (event.alpha !== null) {
                 let heading = 360 - event.alpha;
                 currentHeading = heading;
                 updateCompass(currentHeading);
             }
             
-            // Calcular inclinação do dispositivo
+            // Calcular inclinação do dispositivo (pitch)
             currentTilt = Math.round(Math.abs(deviceOrientation.beta));
             tiltValue.textContent = `${currentTilt}°`;
         }
@@ -857,14 +883,7 @@
             const markerElement = marker.getElement();
             if (!markerElement) return;
             
-            const direction = markerElement.querySelector('.marker-direction');
             const icon = markerElement.querySelector('.marker-icon');
-            
-            if (direction) {
-                // Rotacionar seta externa (triangulo amarelo) - posiciona no topo e rotaciona
-                const arrowAngle = heading - 90; // Ajuste para apontar corretamente
-                direction.style.transform = `translate(-50%, -50%) translateY(-20px) rotate(${arrowAngle}deg)`;
-            }
             
             if (icon) {
                 // Rotacionar ícone interno
@@ -1029,7 +1048,6 @@
                         <div class="marker-pulse"></div>
                         <div class="marker-pulse-2"></div>
                         <div class="marker-outer-ring"></div>
-                        <div class="marker-direction"></div>
                         <div class="marker-icon"><i class="fas fa-location-arrow"></i></div>
                         <div class="marker-label">${techName.textContent}</div>
                     `,
@@ -1092,6 +1110,7 @@
         function startTracking() {
             if (isTracking) return;
 
+            updateTrackingBadge('searching', 'Buscando');
             showToast('<i class="fas fa-satellite"></i>', 'Ativando GPS + Sensores...');
             gpsStatus.className = 'gps-indicator';
 
@@ -1108,6 +1127,34 @@
             );
         }
 
+        function updateTrackingBadge(status, text) {
+            const badge = trackingStatus;
+            const icon = badge.querySelector('.status-badge-icon');
+            const textEl = badge.querySelector('.status-badge-text');
+
+            badge.className = 'status-badge';
+            
+            switch(status) {
+                case 'active':
+                    badge.classList.add('active');
+                    icon.className = 'fas fa-satellite status-badge-icon';
+                    textEl.textContent = text || 'Ativo';
+                    break;
+                case 'searching':
+                    icon.className = 'fas fa-satellite-dish status-badge-icon';
+                    textEl.textContent = text || 'Buscando';
+                    break;
+                case 'error':
+                    badge.classList.add('error');
+                    icon.className = 'fas fa-exclamation-triangle status-badge-icon';
+                    textEl.textContent = text || 'Erro';
+                    break;
+                default:
+                    icon.className = 'fas fa-satellite-dish status-badge-icon';
+                    textEl.textContent = 'Aguarde';
+            }
+        }
+
         function handlePositionSuccess(position) {
             const accuracy = Math.round(position.coords.accuracy);
 
@@ -1117,6 +1164,7 @@
                     showToast('<i class="fas fa-exclamation-triangle"></i>', message, 5000);
                     lastToastMessage = message;
                 }
+                updateTrackingBadge('searching', `${accuracy}m`);
                 return;
             }
 
@@ -1127,7 +1175,7 @@
                 lng: position.coords.longitude,
                 accuracy: accuracy,
                 speed: position.coords.speed ? position.coords.speed * 3.6 : 0,
-                heading: position.coords.heading || currentHeading, // Usar heading do GPS ou bússola
+                heading: position.coords.heading || currentHeading,
                 altitude: position.coords.altitude,
                 altitudeAccuracy: position.coords.altitudeAccuracy,
                 compass_direction: compassDirection,
@@ -1139,10 +1187,11 @@
 
             if (!isTracking) {
                 isTracking = true;
-                fabBtn.classList.add('recording');
-                fabIcon.className = 'fas fa-stop';
+                updateTrackingBadge('active', `${accuracy}m`);
                 showToast('<i class="fas fa-check-circle"></i>', `Rastreamento ativo! Precisão: ${accuracy}m`, 3000);
                 requestWakeLock();
+            } else {
+                updateTrackingBadge('active', `${accuracy}m`);
             }
         }
 
@@ -1153,13 +1202,18 @@
             switch(error.code) {
                 case 1:
                     msg = 'Permissão de localização negada';
+                    updateTrackingBadge('error', 'Negado');
                     break;
                 case 2:
                     msg = 'GPS indisponível no dispositivo';
+                    updateTrackingBadge('error', 'Indisponível');
                     break;
                 case 3:
                     msg = 'Tempo limite excedido';
+                    updateTrackingBadge('error', 'Timeout');
                     break;
+                default:
+                    updateTrackingBadge('error', 'Erro');
             }
 
             showToast('<i class="fas fa-times-circle"></i>', msg);
@@ -1170,9 +1224,8 @@
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
                 isTracking = false;
-                fabBtn.classList.remove('recording');
-                fabIcon.className = 'fas fa-play';
                 gpsStatus.className = 'gps-indicator';
+                updateTrackingBadge('default', 'Pausado');
                 showToast('<i class="fas fa-pause-circle"></i>', 'Rastreamento pausado');
                 releaseWakeLock();
             }
@@ -1228,14 +1281,6 @@
         // ============================================
         // EVENT LISTENERS
         // ============================================
-        fabBtn.addEventListener('click', () => {
-            if (isTracking) {
-                stopTracking();
-            } else {
-                startTracking();
-            }
-        });
-
         toggleCardBtn.addEventListener('click', () => {
             statusCard.classList.toggle('minimized');
             const icon = toggleCardBtn.querySelector('i');
@@ -1291,7 +1336,6 @@
                         <div class="marker-pulse"></div>
                         <div class="marker-pulse-2"></div>
                         <div class="marker-outer-ring"></div>
-                        <div class="marker-direction"></div>
                         <div class="marker-icon"><i class="fas fa-location-arrow"></i></div>
                         <div class="marker-label">${newLabel}</div>
                     `,
@@ -1329,5 +1373,5 @@
             }, 1000);
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdf33f8e32d261c',t:'MTc2ODQxNTQxMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdf3d4d72c3261c',t:'MTc2ODQxNTc5Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
