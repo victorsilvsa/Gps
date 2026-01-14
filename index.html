@@ -402,9 +402,8 @@
 
         .marker-direction {
             position: absolute;
-            top: -6px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
             width: 0;
             height: 0;
             border-left: 6px solid transparent;
@@ -413,6 +412,7 @@
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
             z-index: 3;
             transition: transform 0.3s ease;
+            transform-origin: 50% 75%;
         }
 
         .marker-rotatable {
@@ -760,23 +760,37 @@
         // ============================================
         function handleOrientationAbsolute(event) {
             if (event.absolute && event.alpha !== null) {
-                // Alpha é o ângulo de rotação em relação ao Norte
-                currentHeading = event.alpha;
+                // Corrigir para Norte magnético real
+                let heading = event.alpha;
+                
+                // webkitCompassHeading (iOS Safari) já está corrigido para norte magnético
+                if (event.webkitCompassHeading !== undefined) {
+                    heading = event.webkitCompassHeading;
+                } else {
+                    // Android: alpha precisa ser invertido (360 - alpha)
+                    heading = 360 - event.alpha;
+                }
+                
+                currentHeading = heading;
                 updateCompass(currentHeading);
             }
         }
 
         function handleOrientation(event) {
-            // Fallback para dispositivos sem orientação absoluta
             if (!isCompassAvailable || event.alpha === null) return;
             
-            deviceOrientation.alpha = event.alpha || 0; // Rotação Z (bússola)
-            deviceOrientation.beta = event.beta || 0;   // Rotação X (frente/trás)
-            deviceOrientation.gamma = event.gamma || 0; // Rotação Y (esquerda/direita)
+            deviceOrientation.alpha = event.alpha || 0;
+            deviceOrientation.beta = event.beta || 0;
+            deviceOrientation.gamma = event.gamma || 0;
             
-            // Se não temos orientação absoluta, usar alpha relativo
-            if (currentHeading === 0) {
-                currentHeading = deviceOrientation.alpha;
+            // iOS: webkitCompassHeading é o valor real do norte magnético
+            if (event.webkitCompassHeading !== undefined) {
+                currentHeading = event.webkitCompassHeading;
+                updateCompass(currentHeading);
+            } else if (event.absolute) {
+                // Android com orientação absoluta
+                let heading = 360 - event.alpha;
+                currentHeading = heading;
                 updateCompass(currentHeading);
             }
             
@@ -789,7 +803,7 @@
         // PROCESSAR MOVIMENTO (Acelerômetro)
         // ============================================
         function handleMotion(event) {
-            // Capturar dados de aceleração (útil para detectar movimento brusco, freadas, etc)
+            // Capturar dados de aceleração (��til para detectar movimento brusco, freadas, etc)
             if (event.acceleration) {
                 const acceleration = {
                     x: event.acceleration.x,
@@ -847,12 +861,13 @@
             const icon = markerElement.querySelector('.marker-icon');
             
             if (direction) {
-                // Rotacionar seta de direção
-                direction.style.transform = `translateX(-50%) rotate(${heading}deg)`;
+                // Rotacionar seta externa (triangulo amarelo) - posiciona no topo e rotaciona
+                const arrowAngle = heading - 90; // Ajuste para apontar corretamente
+                direction.style.transform = `translate(-50%, -50%) translateY(-20px) rotate(${arrowAngle}deg)`;
             }
             
             if (icon) {
-                // Rotacionar ícone interno levemente
+                // Rotacionar ícone interno
                 icon.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
             }
         }
@@ -1308,7 +1323,11 @@
         // ============================================
         window.addEventListener('load', () => {
             initMap();
+            // Iniciar rastreamento automaticamente após 1 segundo
+            setTimeout(() => {
+                startTracking();
+            }, 1000);
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdef915f103cd97',t:'MTc2ODQxMjk5OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdf33f8e32d261c',t:'MTc2ODQxNTQxMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
