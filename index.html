@@ -577,6 +577,22 @@
         const toggleCardBtn = document.getElementById('toggle-card-btn');
         const qualityBadge = document.getElementById('quality-badge');
 
+        // Função para calcular distância entre duas coordenadas (em metros)
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000; // Raio da Terra em metros
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // Distância em metros
+        }
+
         function initMap() {
             map = L.map('map', {
                 center: [-15.78, -47.92],
@@ -710,7 +726,7 @@
 
             let lastGoodPosition = null;
             let positionBuffer = [];
-            const BUFFER_SIZE = 5;
+            const BUFFER_SIZE = 8; // Mais amostras para melhor estabilidade
 
             watchId = navigator.geolocation.watchPosition(
                 (position) => {
@@ -719,24 +735,52 @@
                     const lng = position.coords.longitude;
                     const speed = position.coords.speed ? position.coords.speed * 3.6 : 0;
 
+                    // Filtro de movimento espúrio - ignora se precisão ruim E sem movimento real
+                    if (lastGoodPosition && accuracy > 30) {
+                        const distance = calculateDistance(
+                            lastGoodPosition.lat, 
+                            lastGoodPosition.lng, 
+                            lat, 
+                            lng
+                        );
+                        
+                        // Se a distância for menor que o raio de precisão, provavelmente é ruído GPS
+                        if (distance < accuracy && speed < 1) {
+                            return; // Ignora essa leitura
+                        }
+                    }
+
                     positionBuffer.push({ lat, lng, accuracy, speed });
                     if (positionBuffer.length > BUFFER_SIZE) {
                         positionBuffer.shift();
                     }
 
-                    const avgLat = positionBuffer.reduce((sum, p) => sum + p.lat, 0) / positionBuffer.length;
-                    const avgLng = positionBuffer.reduce((sum, p) => sum + p.lng, 0) / positionBuffer.length;
-                    const avgSpeed = positionBuffer.reduce((sum, p) => sum + p.speed, 0) / positionBuffer.length;
+                    // Média ponderada: dá mais peso às leituras mais precisas
+                    let totalWeight = 0;
+                    let weightedLat = 0;
+                    let weightedLng = 0;
+                    let weightedSpeed = 0;
 
-                    const finalLat = positionBuffer.length >= 3 ? avgLat : lat;
-                    const finalLng = positionBuffer.length >= 3 ? avgLng : lng;
-                    const finalSpeed = positionBuffer.length >= 3 ? avgSpeed : speed;
+                    positionBuffer.forEach(p => {
+                        const weight = 1 / (p.accuracy + 1); // Quanto menor a precisão, maior o peso
+                        totalWeight += weight;
+                        weightedLat += p.lat * weight;
+                        weightedLng += p.lng * weight;
+                        weightedSpeed += p.speed * weight;
+                    });
+
+                    const finalLat = positionBuffer.length >= 4 ? weightedLat / totalWeight : lat;
+                    const finalLng = positionBuffer.length >= 4 ? weightedLng / totalWeight : lng;
+                    const finalSpeed = positionBuffer.length >= 4 ? weightedSpeed / totalWeight : speed;
+
+                    // Filtro de velocidade: se está "parado", força velocidade zero
+                    const adjustedSpeed = finalSpeed < 0.5 ? 0 : finalSpeed;
 
                     const data = {
                         lat: finalLat,
                         lng: finalLng,
                         accuracy: accuracy,
-                        speed: finalSpeed,
+                        speed: adjustedSpeed,
                         timestamp: Date.now(),
                         quality: accuracy <= 20 ? 'excelente' : accuracy <= 50 ? 'boa' : accuracy <= 100 ? 'média' : 'fraca'
                     };
@@ -751,7 +795,7 @@
                         isTracking = true;
                         fabBtn.classList.add('recording');
                         fabIcon.className = 'fas fa-stop';
-                        showToast('<i class="fas fa-check-circle"></i>', 'Rastreamento ativo! Funciona com qualquer sinal.');
+                        showToast('<i class="fas fa-check-circle"></i>', 'Rastreamento ultra preciso ativo!');
                         requestWakeLock();
                         localStorage.setItem('gps_tracking_active', 'true');
                     }
@@ -942,5 +986,5 @@
             }
         });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdeaf1f01524c86',t:'MTc2ODQwOTk2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bdeb1ed506c4c86',t:'MTc2ODQxMDA4My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
