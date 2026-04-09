@@ -988,21 +988,13 @@ function renderCamera() {
         <span>Procurando QR Code...</span>
       </div>
       
-      <!-- Scanning line animation -->
-      <div id="scanLine" style="position:absolute;inset:0;pointer-events:none;z-index:5;opacity:0">
-        <div style="position:absolute;width:100%;height:2px;background:linear-gradient(90deg,transparent,#3b82f6,transparent);top:50%;animation:scanMove 2s infinite"></div>
-      </div>
+
     </div>
     
     <style>
       @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
-      }
-      @keyframes scanMove {
-        0% { top: 10%; }
-        50% { top: 50%; }
-        100% { top: 90%; }
       }
     </style>
     
@@ -1061,6 +1053,16 @@ function renderCamera() {
             if (code) {
               try {
                 const qrData = JSON.parse(code.data);
+                // Vibração + borda verde
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                const reticle = document.getElementById('cameraReticle');
+                reticle.style.opacity = '1';
+                reticle.style.borderColor = '#22c55e';
+                reticle.style.boxShadow = 'inset 0 0 20px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.8)';
+                setTimeout(() => {
+                  reticle.style.borderColor = '#3b82f6';
+                  reticle.style.boxShadow = 'inset 0 0 20px rgba(59,130,246,0.3)';
+                }, 600);
                 handleScannedQR(qrData);
               } catch (e) {
                 // Invalid QR data
@@ -1243,63 +1245,102 @@ function downloadScannedQRPDF(qrId, filename, qrDataEncoded) {
     format: 'a4'
   });
   
-  // White background
+  // Fundo branco
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, 210, 297, 'F');
   
-  // Header
+  // Header Premium
+  const gradient = doc.createLinearGradient(0, 0, 210, 40);
   doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, 210, 45, 'F');
+  doc.rect(0, 0, 210, 50, 'F');
   
-  doc.setTextColor(241, 245, 249);
-  doc.setFontSize(18);
+  // Linha decorativa
+  doc.setFillColor(59, 130, 246);
+  doc.rect(0, 50, 210, 2, 'F');
+  
+  // Título
+  doc.setTextColor(59, 130, 246);
+  doc.setFontSize(28);
   doc.setFont(undefined, 'bold');
-  doc.text('PALETE #' + qrData.paleteNumber, 15, 18);
+  doc.text('PALETE', 15, 25);
+  doc.setFontSize(24);
+  doc.text('#' + qrData.paleteNumber, 75, 25);
   
-  doc.setFontSize(11);
-  doc.text('Lote: ' + qrData.lot, 15, 28);
+  // Subtítulo
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.text('Lote: ' + qrData.lot + ' | Data: ' + qrData.date, 15, 37);
   
-  doc.setFontSize(9);
-  doc.setTextColor(200, 200, 200);
-  const hoje = new Date().toLocaleDateString('pt-BR');
-  doc.text('Leitura: ' + hoje, 15, 37);
-  
-  // Centered QR Code
+  // QR Code grande e centralizado
   const qrImage = canvas.toDataURL('image/png');
-  const qrSize = 100;
+  const qrSize = 110;
   const qrX = (210 - qrSize) / 2;
-  doc.addImage(qrImage, 'PNG', qrX, 60, qrSize, qrSize);
+  doc.addImage(qrImage, 'PNG', qrX, 65, qrSize, qrSize);
   
-  // Info section
+  // Moldura ao redor do QR
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.5);
+  doc.rect(qrX - 5, 60, qrSize + 10, qrSize + 10);
+  
+  // Seção de informações em cards
+  let cardY = 185;
+  
+  // Card 1: Fornecedor
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(15, cardY, 90, 24, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'bold');
+  doc.text('FORNECEDOR', 20, cardY + 6);
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(10);
   doc.setFont(undefined, 'bold');
-  doc.text('Informações do Palete:', 15, 170);
+  doc.text(qrData.supplier, 20, cardY + 16);
   
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  const info = [
-    ['Fornecedor', qrData.supplier],
-    ['Nota Fiscal', qrData.invoiceNumber],
-    ['Lote', qrData.lot],
-    ['Matéria-Prima', qrData.material],
-    ['IF Value', qrData.ifValue.toFixed(2) + ' g/10min'],
-    ['Responsável', qrData.responsible],
-    ['Data Carregamento', qrData.date]
-  ];
-  
-  let infoY = 177;
-  info.forEach(([key, val]) => {
-    doc.setFont(undefined, 'bold');
-    doc.text(key + ':', 15, infoY);
-    doc.setFont(undefined, 'normal');
-    doc.text(val, 60, infoY);
-    infoY += 7;
-  });
-  
+  // Card 2: NF
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(105, cardY, 90, 24, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
   doc.setFontSize(8);
+  doc.setFont(undefined, 'bold');
+  doc.text('NOTA FISCAL', 110, cardY + 6);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.text(qrData.invoiceNumber, 110, cardY + 16);
+  
+  cardY += 30;
+  
+  // Card 3: Matéria-Prima
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(15, cardY, 90, 24, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'bold');
+  doc.text('MATÉRIA-PRIMA', 20, cardY + 6);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.text(qrData.material, 20, cardY + 16);
+  
+  // Card 4: IF Value (destaque especial)
+  doc.setFillColor(59, 130, 246);
+  doc.roundedRect(105, cardY, 90, 24, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'bold');
+  doc.text('IF VALUE (g/10min)', 110, cardY + 6);
+  doc.setFontSize(13);
+  doc.setFont(undefined, 'bold');
+  doc.text(qrData.ifValue.toFixed(2), 110, cardY + 16);
+  
+  // Rodapé
   doc.setTextColor(150, 150, 150);
-  doc.text('Este QR Code contém todas as informações do palete para rastreabilidade', 15, 285);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 15, 285);
+  doc.text('Este QR Code garante rastreabilidade completa do palete', 15, 291);
   
   doc.save(`${filename}.pdf`);
   toast('PDF gerado!');
@@ -1682,5 +1723,5 @@ renderCurrentTab();
 
 
 </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b0415e3bdf18b',t:'MTc3NTc1MzQ4MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b0a1f072df18b',t:'MTc3NTc1MzcyOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
