@@ -412,8 +412,7 @@ select.input-field {
  <body>
   <div class="app-root" id="app">
    <div class="main-scroll" id="mainContent"></div>
-   <nav class="bottom-nav">
-    <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"> <i class="fa-solid fa-house"></i><span>Início</span> </button> <button class="nav-btn" data-tab="loads" onclick="switchTab('loads')"> <i class="fa-solid fa-truck"></i><span>Carregamentos</span> </button> <button class="nav-btn" data-tab="camera" onclick="switchTab('camera')"> <i class="fa-solid fa-camera"></i><span>Câmera</span> </button> <button class="nav-btn" data-tab="qrcode" onclick="switchTab('qrcode')"> <i class="fa-solid fa-qrcode"></i><span>QR Code</span> </button> <button class="nav-btn" data-tab="materials" onclick="switchTab('materials')"> <i class="fa-solid fa-flask"></i><span>Matérias</span> </button>
+   <nav class="bottom-nav"><button class="nav-btn active" data-tab="home" onclick="switchTab('home')"> <i class="fa-solid fa-house"></i><span>Início</span> </button> <button class="nav-btn" data-tab="loads" onclick="switchTab('loads')"> <i class="fa-solid fa-truck"></i><span>Carregamentos</span> </button> <button class="nav-btn" data-tab="camera" onclick="switchTab('camera')"> <i class="fa-solid fa-camera"></i><span>Câmera</span> </button> <button class="nav-btn" data-tab="qrcode" onclick="switchTab('qrcode')"> <i class="fa-solid fa-qrcode"></i><span>QR Code</span> </button> <button class="nav-btn" data-tab="materials" onclick="switchTab('materials')"> <i class="fa-solid fa-flask"></i><span>Matérias</span> </button>
    </nav>
   </div>
   <script>
@@ -808,13 +807,14 @@ function downloadQRCodePDF(qrId, filename) {
   const paleteNum = modalTitle.match(/Palete (\d+)/)[1];
   
   // Get the actual load data to extract info
-  let loadId, loadData;
+  let loadId, loadData, paleteData;
   for (const [lid, l] of Object.entries(loads)) {
     if (l.paletes) {
       for (const [pid, p] of Object.entries(l.paletes)) {
         if (`qr-${lid}-${pid}` === qrId) {
           loadId = lid;
           loadData = l;
+          paleteData = p;
           break;
         }
       }
@@ -833,69 +833,150 @@ function downloadQRCodePDF(qrId, filename) {
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, 210, 297, 'F');
   
-  // Header with dark background
+  // === HEADER PREMIUM ===
   doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, 210, 55, 'F');
+  doc.rect(0, 0, 210, 60, 'F');
   
-  // Title and main info in header
-  doc.setTextColor(241, 245, 249);
-  doc.setFontSize(18);
+  // Linha decorativa azul
+  doc.setFillColor(59, 130, 246);
+  doc.rect(0, 60, 210, 2, 'F');
+  
+  // Título principal
+  doc.setTextColor(59, 130, 246);
+  doc.setFontSize(32);
   doc.setFont(undefined, 'bold');
-  doc.text('PALETE #' + paleteNum, 20, 18);
+  doc.text('PALETE', 15, 25);
+  doc.setFontSize(28);
+  doc.text('#' + paleteNum, 90, 25);
   
-  doc.setFontSize(12);
-  doc.setFont(undefined, 'normal');
-  doc.text('Lote: ' + loadData.lot, 20, 28);
-  
-  // Get current date
-  const today = new Date();
-  const dataChegada = today.toLocaleDateString('pt-BR');
-  doc.text('Data de Chegada: ' + dataChegada, 20, 36);
-  
-  doc.setFontSize(10);
-  doc.setTextColor(200, 200, 200);
-  doc.text('Número do Palete: ' + paleteNum, 20, 44);
-  
+  // Info no header
+  doc.setTextColor(100, 116, 139);
   doc.setFontSize(9);
-  doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 20, 51);
-  
-  // QR Code centered and larger
-  const qrImage = canvas.toDataURL('image/png');
-  const qrSize = 120;
-  const qrX = (210 - qrSize) / 2;
-  doc.addImage(qrImage, 'PNG', qrX, 65, qrSize, qrSize);
-  
-  // Info section below QR
-  doc.setTextColor(30, 41, 59);
-  doc.setFontSize(10);
-  doc.setFont(undefined, 'bold');
-  doc.text('Informações do Palete:', 20, 195);
-  
   doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  const matName = materials[loadData.materialId]?.name || 'N/A';
-  const infoData = [
-    ['Fornecedor', loadData.supplier],
-    ['Nota Fiscal', loadData.invoiceNumber || 'N/A'],
-    ['Lote', loadData.lot],
-    ['Matéria-Prima', matName],
-    ['Responsável', loadData.responsible],
-    ['Data do Carregamento', formatDate(loadData.date)]
-  ];
+  doc.text('Lote: ' + loadData.lot, 15, 35);
+  doc.text('Fornecedor: ' + loadData.supplier, 15, 41);
   
-  let infoY = 202;
-  infoData.forEach(([key, val]) => {
-    doc.setFont(undefined, 'bold');
-    doc.text(key + ':', 20, infoY);
-    doc.setFont(undefined, 'normal');
-    doc.text(val, 70, infoY);
-    infoY += 7;
-  });
-  
-  // Footer
+  // Data e hora
   doc.setFontSize(8);
+  doc.setTextColor(80, 90, 110);
+  const dataCompleta = new Date().toLocaleString('pt-BR');
+  doc.text('Gerado em: ' + dataCompleta, 15, 52);
+  
+  // === QR CODE SECTION ===
+  const qrImage = canvas.toDataURL('image/png');
+  const qrSize = 100;
+  const qrX = (210 - qrSize) / 2;
+  doc.addImage(qrImage, 'PNG', qrX, 70, qrSize, qrSize);
+  
+  // Moldura ao redor do QR
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.5);
+  doc.rect(qrX - 3, 67, qrSize + 6, qrSize + 6);
+  
+  // === INFORMAÇÕES EM CARDS ===
+  let cardY = 180;
+  const matName = materials[loadData.materialId]?.name || 'N/A';
+  const ifValue = paleteData?.ifValue?.toFixed(2) || '0.00';
+  
+  // Card 1: Fornecedor
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(10, cardY, 95, 20, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('FORNECEDOR', 15, cardY + 5);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text(loadData.supplier, 15, cardY + 14);
+  
+  // Card 2: NF
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(105, cardY, 95, 20, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('NOTA FISCAL', 110, cardY + 5);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text(loadData.invoiceNumber || 'N/A', 110, cardY + 14);
+  
+  cardY += 25;
+  
+  // Card 3: Lote
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(10, cardY, 95, 20, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('LOTE', 15, cardY + 5);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text(loadData.lot, 15, cardY + 14);
+  
+  // Card 4: Matéria-Prima
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(105, cardY, 95, 20, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('MATÉRIA-PRIMA', 110, cardY + 5);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text(matName, 110, cardY + 14);
+  
+  cardY += 25;
+  
+  // Card 5: IF Value (destaque)
+  doc.setFillColor(59, 130, 246);
+  doc.roundedRect(10, cardY, 95, 20, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('IF VALUE (g/10min)', 15, cardY + 5);
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'bold');
+  doc.text(ifValue, 15, cardY + 15);
+  
+  // Card 6: Data Análise
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(105, cardY, 95, 20, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('DATA DA ANÁLISE', 110, cardY + 5);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text(formatDate(paleteData?.date) || 'N/A', 110, cardY + 14);
+  
+  cardY += 25;
+  
+  // Card 7: Responsável
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(10, cardY, 190, 20, 2, 2, 'F');
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  doc.text('RESPONSÁVEL', 15, cardY + 5);
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  doc.text(loadData.responsible || 'N/A', 15, cardY + 14);
+  
+  // === FOOTER ===
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.5);
+  doc.line(10, 280, 200, 280);
+  
+  doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text('Este QR Code contém todas as informações do palete para rastreabilidade', 20, 285);
+  doc.setFont(undefined, 'normal');
+  doc.text('✓ QR Code validado para rastreabilidade completa do palete', 15, 286);
+  doc.text('Documento gerado automaticamente - ' + appTitle, 15, 292);
   
   doc.save(`${filename}.pdf`);
   toast('PDF gerado!');
@@ -962,7 +1043,7 @@ function renderCamera() {
     <h1 style="font-size:20px;font-weight:700;margin-bottom:20px"><i class="fa-solid fa-camera" style="color:#3b82f6;margin-right:8px"></i>Leitor de QR Code</h1>
     
     <div style="position:relative;border-radius:12px;overflow:hidden;background:#0f172a;margin-bottom:16px;aspect-ratio:1/1;max-height:380px;box-shadow:0 8px 32px rgba(59,130,246,0.2)">
-      <video id="cameraFeed" style="width:100%;height:100%;object-fit:cover;display:none"></video>
+      <video id="cameraFeed" style="width:100%;height:100%;object-fit:cover;display:none;transform:scaleX(-1)"></video>
       <div id="cameraPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, #1e293b, #0f172a);color:#94a3b8;font-size:14px;flex-direction:column;gap:12px">
         <i class="fa-solid fa-video" style="font-size:48px;color:#3b82f6;opacity:0.6"></i>
         <span style="font-weight:600">Câmera não iniciada</span>
@@ -970,7 +1051,7 @@ function renderCamera() {
       </div>
       
       <!-- Targeting reticle -->
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:10;opacity:0;transition:opacity 0.3s" id="cameraReticle">
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:10;opacity:0;transition:opacity 0.3s;will-change:opacity" id="cameraReticle">
         <div style="width:200px;height:200px;border:3px solid #3b82f6;border-radius:50%;position:relative;box-shadow:inset 0 0 20px rgba(59,130,246,0.3)">
           <!-- Corner marks -->
           <div style="position:absolute;top:-8px;left:-8px;width:20px;height:20px;border-top:3px solid #22c55e;border-left:3px solid #22c55e"></div>
@@ -978,17 +1059,15 @@ function renderCamera() {
           <div style="position:absolute;bottom:-8px;left:-8px;width:20px;height:20px;border-bottom:3px solid #22c55e;border-left:3px solid #22c55e"></div>
           <div style="position:absolute;bottom:-8px;right:-8px;width:20px;height:20px;border-bottom:3px solid #22c55e;border-right:3px solid #22c55e"></div>
           <!-- Center dot -->
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 12px rgba(34,197,94,0.8)"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;background:#22c55e;border-radius:50%;box-shadow:0 0 12px rgba(34,197,94,0.8);will-change:auto"></div>
         </div>
       </div>
       
       <!-- Status badge -->
-      <div id="cameraStatus" style="position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:6px;background:rgba(34,197,94,0.15);padding:10px 14px;border-radius:8px;border:1px solid rgba(34,197,94,0.4);opacity:0;transition:opacity 0.3s;font-size:12px;color:#22c55e;font-weight:600">
+      <div id="cameraStatus" style="position:absolute;top:12px;left:12px;display:flex;align-items:center;gap:6px;background:rgba(34,197,94,0.15);padding:10px 14px;border-radius:8px;border:1px solid rgba(34,197,94,0.4);opacity:0;transition:opacity 0.3s;font-size:12px;color:#22c55e;font-weight:600;will-change:opacity">
         <div style="width:8px;height:8px;background:#22c55e;border-radius:50%;animation:pulse 1.5s infinite"></div>
         <span>Procurando QR Code...</span>
       </div>
-      
-
     </div>
     
     <style>
@@ -1015,17 +1094,28 @@ function renderCamera() {
     const toggleBtn = document.getElementById('toggleCameraBtn');
     const statusIndicator = document.getElementById('cameraStatus');
     const reticle = document.getElementById('cameraReticle');
-    const scanLine = document.getElementById('scanLine');
     const qrCounter = document.getElementById('qrCounter');
     let isCameraActive = false;
     let stream = null;
     let scanInterval = null;
+    let frameBuffer = null;
+    let scanSkipCounter = 0;
+    const SCAN_SKIP_RATE = 2;
+    const RESOLUTION_HIGH = 640;
     
     toggleBtn.onclick = async () => {
       if (!isCameraActive) {
         try {
           if (scanInterval) clearInterval(scanInterval);
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          const constraints = {
+            video: {
+              facingMode: 'environment',
+              width: { ideal: RESOLUTION_HIGH },
+              height: { ideal: RESOLUTION_HIGH }
+            },
+            audio: false
+          };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
           videoElement.srcObject = stream;
           videoElement.style.display = 'block';
           placeholder.style.display = 'none';
@@ -1034,8 +1124,9 @@ function renderCamera() {
           statusIndicator.style.opacity = '1';
           reticle.style.opacity = '1';
           isCameraActive = true;
+          scanSkipCounter = 0;
           
-          // Start scanning
+          // Start scanning with smart frame skipping
           scanInterval = setInterval(() => {
             if (!isCameraActive) {
               clearInterval(scanInterval);
@@ -1043,32 +1134,46 @@ function renderCamera() {
             }
             if (videoElement.videoWidth === 0) return;
             
-            const canvas = document.createElement('canvas');
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(videoElement, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, canvas.width, canvas.height);
-            if (code) {
-              try {
-                const qrData = JSON.parse(code.data);
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                const currentReticle = document.getElementById('cameraReticle');
-                if (currentReticle) {
-                  currentReticle.style.borderColor = '#22c55e';
-                  currentReticle.style.boxShadow = 'inset 0 0 20px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.8)';
-                  setTimeout(() => {
-                    if (currentReticle && document.body.contains(currentReticle)) {
-                      currentReticle.style.borderColor = '#3b82f6';
-                      currentReticle.style.boxShadow = 'inset 0 0 20px rgba(59,130,246,0.3)';
-                    }
-                  }, 600);
-                }
-                handleScannedQR(qrData);
-              } catch (e) {}
+            // Skip frames on weak devices - but process every 2nd frame consistently
+            scanSkipCounter++;
+            if (scanSkipCounter % SCAN_SKIP_RATE !== 0) return;
+            
+            try {
+              if (!frameBuffer || frameBuffer.width !== videoElement.videoWidth || frameBuffer.height !== videoElement.videoHeight) {
+                frameBuffer = document.createElement('canvas');
+                frameBuffer.width = videoElement.videoWidth;
+                frameBuffer.height = videoElement.videoHeight;
+              }
+              
+              const ctx = frameBuffer.getContext('2d', { willReadFrequently: true });
+              ctx.drawImage(videoElement, 0, 0);
+              const imageData = ctx.getImageData(0, 0, frameBuffer.width, frameBuffer.height);
+              
+              // Use both inversion attempts for better detection on weak light
+              const code = jsQR(imageData.data, frameBuffer.width, frameBuffer.height, { inversionAttempts: 'attemptBoth' });
+              
+              if (code) {
+                try {
+                  const qrData = JSON.parse(code.data);
+                  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                  const currentReticle = document.getElementById('cameraReticle');
+                  if (currentReticle) {
+                    currentReticle.style.borderColor = '#22c55e';
+                    currentReticle.style.boxShadow = 'inset 0 0 20px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.8)';
+                    setTimeout(() => {
+                      if (currentReticle && document.body.contains(currentReticle)) {
+                        currentReticle.style.borderColor = '#3b82f6';
+                        currentReticle.style.boxShadow = 'inset 0 0 20px rgba(59,130,246,0.3)';
+                      }
+                    }, 600);
+                  }
+                  handleScannedQR(qrData);
+                } catch (e) {}
+              }
+            } catch (err) {
+              console.error('Scan error:', err);
             }
-          }, 300);
+          }, 200);
         } catch (err) {
           toast('Erro ao acessar câmera: ' + err.message, true);
         }
@@ -1081,6 +1186,9 @@ function renderCamera() {
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
           stream = null;
+        }
+        if (frameBuffer) {
+          frameBuffer = null;
         }
         videoElement.srcObject = null;
         videoElement.style.display = 'none';
@@ -1705,5 +1813,5 @@ renderCurrentTab();
 
 
 </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b1366f5b2f18b',t:'MTc3NTc1NDEwOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b2333f256f18b',t:'MTc3NTc1NDc1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
