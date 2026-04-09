@@ -412,8 +412,7 @@ select.input-field {
  <body>
   <div class="app-root" id="app">
    <div class="main-scroll" id="mainContent"></div>
-   <nav class="bottom-nav">
-    <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"> <i class="fa-solid fa-house"></i><span>Início</span> </button> <button class="nav-btn" data-tab="loads" onclick="switchTab('loads')"> <i class="fa-solid fa-truck"></i><span>Carregamentos</span> </button> <button class="nav-btn" data-tab="camera" onclick="switchTab('camera')"> <i class="fa-solid fa-camera"></i><span>Câmera</span> </button> <button class="nav-btn" data-tab="qrcode" onclick="switchTab('qrcode')"> <i class="fa-solid fa-qrcode"></i><span>QR Code</span> </button> <button class="nav-btn" data-tab="materials" onclick="switchTab('materials')"> <i class="fa-solid fa-flask"></i><span>Matérias</span> </button>
+   <nav class="bottom-nav"><button class="nav-btn active" data-tab="home" onclick="switchTab('home')"> <i class="fa-solid fa-house"></i><span>Início</span> </button> <button class="nav-btn" data-tab="loads" onclick="switchTab('loads')"> <i class="fa-solid fa-truck"></i><span>Carregamentos</span> </button> <button class="nav-btn" data-tab="camera" onclick="switchTab('camera')"> <i class="fa-solid fa-camera"></i><span>Câmera</span> </button> <button class="nav-btn" data-tab="qrcode" onclick="switchTab('qrcode')"> <i class="fa-solid fa-qrcode"></i><span>QR Code</span> </button> <button class="nav-btn" data-tab="materials" onclick="switchTab('materials')"> <i class="fa-solid fa-flask"></i><span>Matérias</span> </button>
    </nav>
   </div>
   <script>
@@ -1032,7 +1031,6 @@ function renderCamera() {
           toggleBtn.innerHTML = '<i class="fa-solid fa-stop" style="margin-right:6px"></i>Parar';
           statusIndicator.style.opacity = '1';
           reticle.style.opacity = '1';
-          scanLine.style.opacity = '1';
           isCameraActive = true;
           
           // Start scanning
@@ -1723,5 +1721,5 @@ renderCurrentTab();
 
 
 </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b0a1f072df18b',t:'MTc3NTc1MzcyOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b0d5e730cf18b',t:'MTc3NTc1Mzg2MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
