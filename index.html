@@ -412,7 +412,8 @@ select.input-field {
  <body>
   <div class="app-root" id="app">
    <div class="main-scroll" id="mainContent"></div>
-   <nav class="bottom-nav"><button class="nav-btn active" data-tab="home" onclick="switchTab('home')"> <i class="fa-solid fa-house"></i><span>Início</span> </button> <button class="nav-btn" data-tab="loads" onclick="switchTab('loads')"> <i class="fa-solid fa-truck"></i><span>Carregamentos</span> </button> <button class="nav-btn" data-tab="camera" onclick="switchTab('camera')"> <i class="fa-solid fa-camera"></i><span>Câmera</span> </button> <button class="nav-btn" data-tab="qrcode" onclick="switchTab('qrcode')"> <i class="fa-solid fa-qrcode"></i><span>QR Code</span> </button> <button class="nav-btn" data-tab="materials" onclick="switchTab('materials')"> <i class="fa-solid fa-flask"></i><span>Matérias</span> </button>
+   <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"> <i class="fa-solid fa-house"></i><span>Início</span> </button> <button class="nav-btn" data-tab="loads" onclick="switchTab('loads')"> <i class="fa-solid fa-truck"></i><span>Carregamentos</span> </button> <button class="nav-btn" data-tab="camera" onclick="switchTab('camera')"> <i class="fa-solid fa-camera"></i><span>Câmera</span> </button> <button class="nav-btn" data-tab="qrcode" onclick="switchTab('qrcode')"> <i class="fa-solid fa-qrcode"></i><span>QR Code</span> </button> <button class="nav-btn" data-tab="materials" onclick="switchTab('materials')"> <i class="fa-solid fa-flask"></i><span>Matérias</span> </button>
    </nav>
   </div>
   <script>
@@ -1023,6 +1024,7 @@ function renderCamera() {
     toggleBtn.onclick = async () => {
       if (!isCameraActive) {
         try {
+          if (scanInterval) clearInterval(scanInterval);
           stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
           videoElement.srcObject = stream;
           videoElement.style.display = 'block';
@@ -1051,36 +1053,41 @@ function renderCamera() {
             if (code) {
               try {
                 const qrData = JSON.parse(code.data);
-                // Vibração + borda verde
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                const reticle = document.getElementById('cameraReticle');
-                reticle.style.opacity = '1';
-                reticle.style.borderColor = '#22c55e';
-                reticle.style.boxShadow = 'inset 0 0 20px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.8)';
-                setTimeout(() => {
-                  reticle.style.borderColor = '#3b82f6';
-                  reticle.style.boxShadow = 'inset 0 0 20px rgba(59,130,246,0.3)';
-                }, 600);
+                const currentReticle = document.getElementById('cameraReticle');
+                if (currentReticle) {
+                  currentReticle.style.borderColor = '#22c55e';
+                  currentReticle.style.boxShadow = 'inset 0 0 20px rgba(34, 197, 94, 0.6), 0 0 30px rgba(34, 197, 94, 0.8)';
+                  setTimeout(() => {
+                    if (currentReticle && document.body.contains(currentReticle)) {
+                      currentReticle.style.borderColor = '#3b82f6';
+                      currentReticle.style.boxShadow = 'inset 0 0 20px rgba(59,130,246,0.3)';
+                    }
+                  }, 600);
+                }
                 handleScannedQR(qrData);
-              } catch (e) {
-                // Invalid QR data
-              }
+              } catch (e) {}
             }
           }, 300);
         } catch (err) {
           toast('Erro ao acessar câmera: ' + err.message, true);
         }
       } else {
-        if (stream) stream.getTracks().forEach(track => track.stop());
-        if (scanInterval) clearInterval(scanInterval);
+        isCameraActive = false;
+        if (scanInterval) {
+          clearInterval(scanInterval);
+          scanInterval = null;
+        }
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
         videoElement.srcObject = null;
         videoElement.style.display = 'none';
         placeholder.style.display = 'flex';
         toggleBtn.innerHTML = '<i class="fa-solid fa-play" style="margin-right:6px"></i>Iniciar';
         statusIndicator.style.opacity = '0';
         reticle.style.opacity = '0';
-        scanLine.style.opacity = '0';
-        isCameraActive = false;
       }
     };
   }, 100);
@@ -1637,7 +1644,6 @@ function generatePDF(id) {
   if (!l) return;
   const mat = materials[l.materialId];
   const matName = mat?.name || 'N/A';
-  const paletes = l.paletes ? Object.values(l.paletes) : [];
   const s = getLoadStats(l);
   const status = s.total === 0 ? 'PENDENTE' : s.pct >= 80 ? 'APROVADO' : 'REPROVADO';
 
@@ -1678,30 +1684,8 @@ function generatePDF(id) {
     y += 6;
   });
 
-  // Table
-  y += 6;
-  if (paletes.length > 0) {
-    doc.autoTable({
-      startY: y,
-      head: [['#', 'Data Análise', 'IF (g/10min)', 'Status']],
-      body: paletes.map((p, i) => {
-        const ok = mat && p.ifValue >= mat.ifMin && p.ifValue <= mat.ifMax;
-        return [i + 1, formatDate(p.date), p.ifValue.toFixed(2), ok ? 'DENTRO' : 'FORA'];
-      }),
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246], textColor: 255 },
-      styles: { fontSize: 9 },
-      didParseCell: function (data) {
-        if (data.section === 'body' && data.column.index === 3) {
-          data.cell.styles.textColor = data.cell.raw === 'DENTRO' ? [34, 197, 94] : [239, 68, 68];
-          data.cell.styles.fontStyle = 'bold';
-        }
-      }
-    });
-    y = doc.lastAutoTable.finalY + 10;
-  }
-
   // Summary
+  y += 10;
   doc.setFillColor(s.pct >= 80 ? 230 : 254, s.pct >= 80 ? 255 : 226, s.pct >= 80 ? 230 : 226);
   doc.roundedRect(14, y, 182, 24, 3, 3, 'F');
   doc.setFontSize(12);
@@ -1721,5 +1705,5 @@ renderCurrentTab();
 
 
 </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b0d5e730cf18b',t:'MTc3NTc1Mzg2MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e9b1366f5b2f18b',t:'MTc3NTc1NDEwOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
